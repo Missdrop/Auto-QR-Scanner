@@ -85,7 +85,6 @@ class Student:
             self._ams.state(url)
             self._enqueue(url, student.get("token", ""))
             return
-        self._notify("Browser profile saved; sign in on any site inside the browser")
         if not self._browser.open(url or "about:blank"):
             self._notify("Cannot open the student page; check the installed browser")
         elif url is not None:
@@ -247,7 +246,7 @@ class Student:
         return Handler
 
     def status(self) -> str:
-        return "Browser profile saved; sign in on any site inside the browser"
+        return ""
 
     def close(self) -> None:
         self._closed = True

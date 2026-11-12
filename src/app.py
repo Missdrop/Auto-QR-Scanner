@@ -64,7 +64,6 @@ class App(QObject):
         self._window.start_requested.connect(self._start_monitoring)
         self._window.latest_requested.connect(self._scan_latest)
         self._window.stop_requested.connect(self._wechat.stop)
-        self._window.files_requested.connect(self._scan_files)
         self._window.retry_requested.connect(self._submit_incoming)
         self._window.login_requested.connect(self._open_login)
         self._window.student_open_requested.connect(self._open_student)

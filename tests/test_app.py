@@ -63,7 +63,7 @@ class AppTest(unittest.TestCase):
                     path
                 )
                 with patch.object(controller._student, "open") as open_browser:
-                    window.files_requested.emit([path])
+                    controller._scan_files([path])
                     deadline = time.monotonic() + 5
                     while not window._records and time.monotonic() < deadline:
                         self.application.processEvents()
