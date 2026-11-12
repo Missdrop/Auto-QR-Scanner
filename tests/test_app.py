@@ -132,3 +132,18 @@ class AppTest(unittest.TestCase):
             finally:
                 controller.close()
                 window.close()
+
+    def test_image_modes_are_exclusive_and_saved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            settings = QSettings(
+                str(Path(directory) / "settings.ini"), QSettings.Format.IniFormat
+            )
+            window = Window(settings)
+            window._image_modes["compressed"].setChecked(True)
+            self.assertEqual(window.image_mode(), "compressed")
+            self.assertFalse(window.download_originals())
+            self.assertFalse(window._image_modes["original"].isChecked())
+            window.close()
+            restored = Window(settings)
+            self.assertEqual(restored.image_mode(), "compressed")
+            restored.close()

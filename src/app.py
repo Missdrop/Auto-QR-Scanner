@@ -96,7 +96,7 @@ class App(QObject):
                 groups,
                 self.incoming.emit,
                 self.notice.emit,
-                download_originals=self._window.download_originals(),
+                image_mode=self._window.image_mode(),
             )
             self._window.set_monitoring(True)
         except ValueError as exception:
@@ -114,7 +114,7 @@ class App(QObject):
                 self.latest_incoming.emit,
                 self.notice.emit,
                 latest_only=True,
-                download_originals=self._window.download_originals(),
+                image_mode=self._window.image_mode(),
             )
             self._window.set_monitoring(True)
         except ValueError as exception:

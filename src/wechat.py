@@ -38,6 +38,7 @@ class WeChat:
         notify: Callable[[str], None],
         latest_only: bool = False,
         download_originals: bool = False,
+        image_mode: str | None = None,
     ) -> None:
         if self._thread is not None and self._thread.is_alive():
             raise ValueError("Monitoring is already running")
@@ -45,8 +46,13 @@ class WeChat:
         if not names:
             raise ValueError("Enter at least one exact group name")
 
+        self._image_mode = image_mode or (
+            "original" if download_originals else "thumbnail"
+        )
+        if self._image_mode not in {"thumbnail", "compressed", "original"}:
+            raise ValueError("Unknown image source mode")
         self._stop.clear()
-        self._download_originals = download_originals
+        self._download_originals = self._image_mode == "original"
         self._seen.clear()
         self._thread = Thread(
             target=self._run,
@@ -91,6 +97,7 @@ class WeChat:
                 stopped,
                 self._feedback,
                 getattr(self, "_download_originals", False),
+                getattr(self, "_image_mode", None),
             ),
             name="wechat-database",
             daemon=False,

@@ -30,6 +30,7 @@ class DatabaseReader:
         self._decoded: set[str] = set()
         self._versions: dict[str, str] = {}
         self._downloads: OriginalDownloads | None = None
+        self._image_mode: str | None = None
 
     def acknowledgements(self) -> None:
         if self._feedback is None:
@@ -66,7 +67,10 @@ class DatabaseReader:
     def run(self, names: list[str], latest_only: bool) -> None:
         self.notice("Preparing background database access; WeChat can stay minimized")
         source = DatabaseSource(self._images.parent / "wechat", self._images)
-        source.thumbnail_only = self._downloads is None
+        source.image_mode = self._image_mode or (
+            "thumbnail" if self._downloads is None else "original"
+        )
+        source.thumbnail_only = source.image_mode == "thumbnail"
         users = {name: source.resolve(name) for name in names}
         sequences = {}
         pending: dict[str, tuple[str, DatabasePhoto, float]] = {}
@@ -83,6 +87,7 @@ class DatabaseReader:
                     raise ValueError("No recent incoming image in the requested chat")
                 if self._downloads is not None:
                     self._downloads.submit(photo.id, name, user, photo.row)
+                if self._downloads is not None or self._image_mode == "compressed":
                     pending[user + ":" + photo.id] = (name, photo, monotonic() + 60)
                 self.deliver(name, photo)
         if latest_only and not pending:
@@ -141,6 +146,7 @@ def read_database(
     stopped: Any,
     feedback: Any = None,
     download_originals: bool = False,
+    image_mode: str | None = None,
 ) -> None:
     """
     Isolate dependency startup and keep third-party diagnostics out of IPC output.
@@ -152,7 +158,8 @@ def read_database(
         contextlib.redirect_stderr(sink),
     ):
         reader = DatabaseReader(images, output, stopped, feedback)
-        if download_originals:
+        reader._image_mode = image_mode
+        if image_mode == "original" or (image_mode is None and download_originals):
             reader._downloads = OriginalDownloads(
                 images.parent / "wechat", images, reader.notice
             )

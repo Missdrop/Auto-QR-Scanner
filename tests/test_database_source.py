@@ -96,3 +96,21 @@ class DatabaseSourceTest(unittest.TestCase):
         self.assertEqual(
             self.source.resolve("Group [unique@chatroom]"), "unique@chatroom"
         )
+
+    def test_compressed_mode_uses_mid_cache_even_when_original_exists(self):
+        with tempfile.TemporaryDirectory() as directory:
+            image = Path(directory) / "mid.jpg"
+            image.write_bytes(b"photo")
+            self.source.image_mode = "compressed"
+            self.source.media._image_files.return_value = {
+                "mid": (str(image), 5),
+                "original": ("original.dat", 1000),
+            }
+            self.source.media._probe_ct.return_value = None
+            self.source.media.download_image.return_value = str(image)
+            self.source.image("chat", {"local_id": 1})
+            self.source.media.download_image.assert_called_once_with(
+                "chat", 1, shard=None, tier="mid"
+            )
+            self.assertEqual(self.source.image_kind, "compressed")
+            self.source.media.download_image_original.assert_not_called()
