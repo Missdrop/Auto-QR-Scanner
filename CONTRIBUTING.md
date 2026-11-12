@@ -3,11 +3,11 @@
 Use Python 3.12 and uv. Develop on `dev`.
 
 ```powershell
-uv sync --locked
-uv run ruff check .
-uv run ruff format --check .
-uv run pyrefly check
-uv run python -W error::ResourceWarning -m unittest discover -s tests -v
+uv sync --locked --extra wechat
+uv run --extra wechat ruff check .
+uv run --extra wechat ruff format --check .
+uv run --extra wechat pyrefly check
+uv run --extra wechat python -W error::ResourceWarning -m unittest discover -s tests -v
 node --test tests/extension.test.cjs
 ```
 

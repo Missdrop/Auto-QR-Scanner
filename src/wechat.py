@@ -49,6 +49,12 @@ class WeChat:
     def stop(self) -> None:
         self._stop.set()
 
+    def close(self) -> None:
+        self.stop()
+        if self._thread is not None:
+            # Finish the monitor's finally block before the desktop process exits.
+            self._thread.join()
+
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
 
@@ -60,13 +66,20 @@ class WeChat:
     ) -> None:
         client: Any = None
         com: Any = None
+        accessibility: Any = None
         stopped_message = "Monitoring stopped"
         try:
             com = importlib.import_module("pythoncom")
             com.CoInitialize()
+            from .qt_access import QtAccess
+
+            accessibility = QtAccess()
+            accessibility.enable(notify)
             module = self._load_backend()
-            client = module.WeChat()
-            if hasattr(client, "AddListenChat"):
+            # WeChat 4.2 exposes virtual controls without native window handles.
+            # Keep the existing window size instead of resizing a virtual control.
+            client = module.WeChat(resize=False, ads=False, start_listener=False)
+            if module.__name__ == "wxautox4":
                 self._listen(client, names, receive, notify)
             else:
                 self._poll(client, names, receive, notify)
@@ -82,6 +95,11 @@ class WeChat:
                     client.StopListening()
                 except Exception:
                     pass
+            if accessibility is not None:
+                try:
+                    accessibility.close()
+                except OSError:
+                    stopped_message += "; could not restore accessibility state"
             if com is not None:
                 com.CoUninitialize()
             notify(stopped_message)

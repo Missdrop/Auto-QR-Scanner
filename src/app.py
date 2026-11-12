@@ -121,6 +121,6 @@ class App(QObject):
         if self._closed:
             return
         self._closed = True
-        self._wechat.stop()
+        self._wechat.close()
         self._worker.close()
         self._student.close()

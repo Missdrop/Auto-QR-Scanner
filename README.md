@@ -42,7 +42,8 @@ uv run python -m src --scan "C:\photos\example.jpg"
 
 - `wxauto4` 免费后端：单群轮询，间隔约 0.3 秒；需保持目标聊天打开，切换聊天会停止监听。
 - 已单独安装并配置 `wxautox4` 时：使用其多窗口监听接口；该后端需用户自行获取和激活，不随本项目提供。
-- 免费后端当前文档标明支持到微信 `4.1.8.107`。本机微信 `4.2.0.52` 的实际连接测试失败，不能视为支持该版本。程序不会降级微信。
+- 本机微信 `4.2.0.52` 已验证可以初始化并进入指定群的单群轮询。新图片接收到网页处理的完整流程仍需实测，不能据此保证所有 4.2 版本兼容。
+- 对未暴露控件树的客户端，程序会临时启用现有 Qt 无障碍提供器：依据当前 DLL 的指令特征定位并修改一个运行时标志，验证控件树后才继续；失败或正常停止时恢复自己修改的值。不会修改磁盘上的微信文件、读取聊天数据库或修改系统屏幕阅读器设置。方法来源及许可证见 [THIRD_PARTY.md](THIRD_PARTY.md)。
 - 启动时跳过可见的旧消息。窗口隐藏、锁屏、客户端更新或 UI 元素变化可能导致漏取图片；没有后台协议级消息接收保证。
 
 ## 数据与限制
@@ -53,7 +54,7 @@ uv run python -m src --scan "C:\photos\example.jpg"
 - 不保存学生密码，不绕过验证码，不自动延长服务器规定的会话有效期。
 - 配套扩展只在 `ams.xjtlu.edu.cn/studenth5/` 和 `studentpc/` 中运行，访问的本机接口绑定 `127.0.0.1`，默认端口 52841。接口要求随机配对密钥；不监听局域网。
 - 扩展收到 AMS 页面中的会话后才报告可用；保存的会话仍以平台验证为准。页面登出后同步清除本机凭据。浏览器回到 SSO 时若扩展无法观察登出，应以学校页面提示为准重新登录。
-- 原自动化浏览器登录入口在实际 SSO 测试中遇到 HTTP 400 和白屏，已改为普通浏览器加本地配套扩展。扩展加载和真实账号联调尚需用户完成。
+- 原自动化浏览器登录入口在实际 SSO 测试中遇到 HTTP 400 和白屏，已改为普通浏览器加本地配套扩展。已验证扩展配对、真实学生页面会话同步，以及重启后加密会话的读取；平台处理结果仍需有效二维码验证。
 - 最大图片文件 40 MB、解码后 2400 万像素。严重模糊、遮挡或反光可能无法恢复。
 - 扫描队列上限 64 张；队列满时提示重试。关闭程序时尚未处理的队列不保留，已下载的图片可手动重新扫描。
 - 界面显示最近最多 2000 行，启动加载最近 500 次扫描；完整记录仍在本地数据库。
@@ -70,6 +71,7 @@ src/
 ├── __main__.py         # 桌面和命令行入口
 ├── app.py              # App：协调界面、监听和扫描
 ├── wechat.py           # WeChat：客户端适配、消息过滤与图片获取
+├── qt_access.py        # QtAccess：可恢复的微信 Qt 无障碍兼容
 ├── message.py          # ImageMessage：来源与接收时间
 ├── scanner.py          # Scanner：二维码解码
 ├── image_processor.py  # ImageProcessor：拍屏图片预处理
@@ -86,10 +88,10 @@ src/
 ## 开发检查
 
 ```powershell
-uv run ruff check .
-uv run ruff format --check .
-uv run pyrefly check
-uv run python -W error::ResourceWarning -m unittest discover -s tests -v
+uv run --extra wechat ruff check .
+uv run --extra wechat ruff format --check .
+uv run --extra wechat pyrefly check
+uv run --extra wechat python -W error::ResourceWarning -m unittest discover -s tests -v
 node --test tests/extension.test.cjs
 ```
 
