@@ -1,1 +1,3 @@
-"""Scan QR codes from WeChat group images."""
+"""
+Scan QR codes from WeChat group images.
+"""
