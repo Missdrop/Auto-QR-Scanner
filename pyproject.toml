@@ -1,0 +1,41 @@
+[project]
+name = "auto-qr-scanner"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+readme = "README.md"
+dependencies = [
+    "dfindexeddb==20260210",
+    "numpy>=2.2,<3",
+    "opencv-python>=4.11,<5",
+    "playwright==1.65.1",
+    "pyside6-essentials>=6.8,<6.9",
+    "zstandard>=0.23,<1",
+    "zxing-cpp>=3.1.1",
+]
+
+[project.optional-dependencies]
+wechat = [
+    "uiautomation>=2.0 ; sys_platform == 'win32'",
+    "wechatauto-replica==1.2.10",
+    "wxauto4>=41.1.7 ; sys_platform == 'win32'",
+]
+
+[dependency-groups]
+dev = [
+    "pyrefly>=1.4.1",
+    "ruff>=0.17.4",
+    "types-psutil>=7.2.2.20261111",
+    "types-pywin32>=312.0.0.20261104",
+]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pyrefly]
+project-includes = ["src"]
+
+[tool.uv]
+override-dependencies = ["python-snappy>=0.7.3,<1"]
