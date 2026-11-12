@@ -80,6 +80,8 @@ class ConversationSearch(QObject):
     def request(self, query: str) -> None:
         if self._closed:
             return
+        if self._process is not None and not self._process.is_alive():
+            self._dispose_process()
         self._pending_query = query
         if self._process is None:
             context = multiprocessing.get_context("spawn")
@@ -105,6 +107,12 @@ class ConversationSearch(QObject):
     def _receive(self) -> None:
         if self._closed:
             return
+        if self._process is not None and not self._process.is_alive():
+            self._dispose_process()
+            self.failed.emit(
+                "Conversation suggestions unavailable; enter a name manually"
+            )
+            return
         self._send_pending()
         while True:
             try:
@@ -119,9 +127,13 @@ class ConversationSearch(QObject):
 
     def close(self) -> None:
         self._closed = True
+        self._dispose_process()
+
+    def _dispose_process(self) -> None:
         self._timer.stop()
         if self._process is not None:
-            self._process.terminate()
+            if self._process.is_alive():
+                self._process.terminate()
             self._process.join(timeout=2)
             self._process.close()
             self._process = None
