@@ -61,4 +61,4 @@ uv run --extra wechat python -W error::ResourceWarning -m unittest discover -s t
 - 扫码结果以网站实际返回为准；普通链接打开后只能标记为已打开，不能标记为处理成功。
 - 主动下载原图可能操作微信前台，失败提示应说明已知阶段，不猜测用户操作或网站结果。
 
-第三方来源与许可证见 [THIRD_PARTY.md](THIRD_PARTY.md)。Logo 文件位于 `assets`，由内置 image_gen 生成，提示词保存在 `assets/logo-prompt.txt`。
+第三方来源与许可证见 [THIRD_PARTY.md](THIRD_PARTY.md)。Logo 文件位于 `assets`。
