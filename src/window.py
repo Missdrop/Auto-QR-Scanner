@@ -36,6 +36,7 @@ class Window(QMainWindow):
     stop_requested = Signal()
     retry_requested = Signal(object)
     login_requested = Signal()
+    image_folder_requested = Signal()
     student_open_requested = Signal(str)
     closing = Signal()
 
@@ -108,6 +109,7 @@ class Window(QMainWindow):
         self._stop = self._button("停止", self.stop_requested.emit, controls)
         self._stop.setEnabled(False)
         self._button("打开内置浏览器", self.login_requested.emit, controls)
+        self._button("打开图片文件夹", self.image_folder_requested.emit, controls)
         layout.addLayout(controls)
         layout.addWidget(self._automatic)
         layout.addWidget(self._originals)
