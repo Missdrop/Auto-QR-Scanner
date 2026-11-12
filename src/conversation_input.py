@@ -16,18 +16,18 @@ class ConversationInput(QPlainTextEdit):
         self._model = QStringListModel(self)
         self._completer = QCompleter(self._model, self)
         self._completer.setWidget(self)
-        self._completer.setCompletionMode(
-            QCompleter.CompletionMode.UnfilteredPopupCompletion
-        )
+        self._completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        self._completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self._completer.activated.connect(self._choose)
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
-        self._timer.setInterval(250)
+        self._timer.setInterval(100)
         self._timer.timeout.connect(self._query)
         self.textChanged.connect(self._changed)
 
     def _changed(self) -> None:
         if not self._inserting:
+            self._completer.popup().hide()
             self._timer.start()
 
     def _query(self) -> None:
@@ -43,7 +43,8 @@ class ConversationInput(QPlainTextEdit):
         labels = []
         for row in rows:
             name = row.get("remark") or row.get("nick_name") or row["username"]
-            labels.append(f"{name} [{row['username']}]")
+            if name.casefold().startswith(query.casefold()):
+                labels.append(f"{name} [{row['username']}]")
         self._model.setStringList(labels)
         if labels and self.isEnabled():
             self._completer.setCompletionPrefix(query)
