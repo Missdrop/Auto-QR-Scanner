@@ -10,6 +10,27 @@ from typing import Any
 from PySide6.QtCore import QObject, QTimer, Signal
 
 
+def contact_candidates(database: Any, query: str) -> list[dict]:
+    """Match display-name prefixes before limiting results, treating input literally."""
+    if not query:
+        return []
+    connection = database._contact_conn()
+    if connection is None:
+        raise RuntimeError("Contact database unavailable")
+    try:
+        rows = connection.execute(
+            "SELECT username, nick_name, remark FROM contact "
+            "WHERE substr(COALESCE(NULLIF(remark, ''), NULLIF(nick_name, ''), "
+            "username), 1, ?) = ? COLLATE NOCASE "
+            "ORDER BY COALESCE(NULLIF(remark, ''), NULLIF(nick_name, ''), "
+            "username) COLLATE NOCASE, username LIMIT 50",
+            (len(query), query),
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        connection.close()
+
+
 def search_contacts(directory: Path, requests: Any, results: Any) -> None:
     """
     Search only local contact data, without creating a WeChat UI driver.
@@ -30,7 +51,7 @@ def search_contacts(directory: Path, requests: Any, results: Any) -> None:
                 if database is None:
                     module = importlib.import_module("wechatauto.db")
                     database = module.WeChatDB(workdir=str(directory))
-                rows = database.search_contact(query)
+                rows = contact_candidates(database, query)
                 results.put((query, rows, ""))
             except Exception as exception:
                 results.put((query, [], type(exception).__name__))

@@ -96,7 +96,7 @@ class App(QObject):
                 groups,
                 self.incoming.emit,
                 self.notice.emit,
-                image_mode=self._window.image_mode(),
+                image_modes=self._window.image_modes(),
             )
             self._window.set_monitoring(True)
         except ValueError as exception:
@@ -114,7 +114,7 @@ class App(QObject):
                 self.latest_incoming.emit,
                 self.notice.emit,
                 latest_only=True,
-                image_mode=self._window.image_mode(),
+                image_modes=self._window.image_modes(),
             )
             self._window.set_monitoring(True)
         except ValueError as exception:
@@ -135,8 +135,6 @@ class App(QObject):
         self._worker.submit(message, self._window.automatic_open())
 
     def _show_result(self, result: ScanResult, automatic: bool) -> None:
-        if result.codes:
-            self._wechat.decoded(result.message.message_id)
         self._window.add_result(result)
         self._window.show_status(f"{result.status()}: {result.message.image_path.name}")
         if automatic:

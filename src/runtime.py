@@ -1,3 +1,4 @@
+import argparse
 import base64
 import hashlib
 import json
@@ -98,4 +99,14 @@ class Chromium:
 
 
 if __name__ == "__main__":
-    Chromium().install()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ensure", action="store_true")
+    arguments = parser.parse_args()
+    runtime = Chromium()
+    if arguments.ensure:
+        try:
+            runtime.executable()
+        except (OSError, ValueError, KeyError):
+            runtime.install()
+    else:
+        runtime.install()

@@ -8,6 +8,7 @@ def chinese(message: str) -> str:
             "当前为低分辨率图片，正在等待更清晰的缓存版本"
         ),
         "Ready": "就绪",
+        "Select at least one valid image source": "请至少勾选一种图片来源",
         "Conversation suggestions unavailable; enter a name manually": (
             "后台候选读取失败，仍可手动填写精确会话名称"
         ),
@@ -16,6 +17,22 @@ def chinese(message: str) -> str:
         ),
         "Original download unavailable; open the image in WeChat": (
             "原图下载失败，请在电脑微信中打开该图片；缩略图识别不受影响"
+        ),
+        "Original download failed: WeChat controls unavailable": (
+            "原图获取失败：无法读取微信控件，请确认微信已打开并登录"
+        ),
+        "Original download failed: image message not visible": (
+            "原图获取失败：未定位到图片消息，请将微信停留在该图片附近后重试"
+        ),
+        "Original download failed: image viewer did not open": (
+            "原图获取失败：图片窗口未打开，可能未点中图片或操作被打断"
+        ),
+        "Original download failed: original file not received": (
+            "原图获取失败：图片窗口已打开，但未收到原图文件"
+        ),
+        "Original download failed: backend error": "原图获取失败：微信操作后端发生异常",
+        "Original download failed: timed out": (
+            "原图获取超时，请待微信操作完成后重试；其他图片来源不受影响"
         ),
         "Decoded": "已识别",
         "Duplicate": "重复二维码",

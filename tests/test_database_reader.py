@@ -8,6 +8,32 @@ from src.database_reader import DatabaseReader
 
 
 class DatabaseReaderTest(unittest.TestCase):
+    def test_every_selected_version_is_emitted_even_after_success_feedback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            thumb, original = root / "thumb.jpg", root / "original.jpg"
+            thumb.write_bytes(b"thumbnail")
+            original.write_bytes(b"original")
+            photo = Mock()
+            photo.id = "one"
+            feedback, output = Queue(), Mock()
+            reader = DatabaseReader(root / "images", output, Mock(), feedback)
+            reader._image_modes = ["thumbnail", "original"]
+
+            def download(mode):
+                photo.image_kind = mode
+                return thumb if mode == "thumbnail" else original
+
+            photo.download.side_effect = download
+            reader.deliver("Chat", photo)
+            feedback.put("one")
+            reader.deliver("Chat", photo)
+            images = [call.args[0][1] for call in output.put.call_args_list]
+            self.assertEqual(
+                [value.image_kind for value in images], ["thumbnail", "original"]
+            )
+            self.assertTrue(reader._complete(photo))
+
     def test_new_cached_version_is_delivered_but_identical_bytes_are_not(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -40,7 +66,7 @@ class DatabaseReaderTest(unittest.TestCase):
                 [b"small-photo", b"full-photo"],
             )
 
-    def test_download_starts_before_decode_and_success_skips_original_scan(self):
+    def test_download_starts_before_decode_and_success_does_not_cancel_it(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             thumb = root / "thumb.jpg"
@@ -53,7 +79,7 @@ class DatabaseReaderTest(unittest.TestCase):
             source.resolve.return_value = "chat-user"
             source.latest.return_value = [photo]
             feedback, output, stopped = Queue(), Mock(), Mock()
-            stopped.wait.return_value = False
+            stopped.wait.side_effect = [False, True]
             stopped.is_set.return_value = False
             reader = DatabaseReader(root / "images", output, stopped, feedback)
             reader._downloads = Mock()
@@ -66,8 +92,8 @@ class DatabaseReaderTest(unittest.TestCase):
             output.put.side_effect = receive
             with patch("src.database_reader.DatabaseSource", return_value=source):
                 reader.run(["chat"], True)
-            photo.download.assert_called_once()
-            reader._downloads.cancel.assert_called_once_with("image")
+            self.assertEqual(photo.download.call_count, 2)
+            reader._downloads.cancel.assert_not_called()
 
     def test_new_images_wait_for_cache_without_replaying_baseline(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

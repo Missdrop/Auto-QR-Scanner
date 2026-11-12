@@ -120,11 +120,11 @@ class QtAccess:
         return list(dict.fromkeys(target for _, target in candidates))
 
     @staticmethod
-    def _window() -> tuple[int, int]:
+    def _window(include_hidden: bool = False) -> tuple[int, int]:
         candidates = []
 
         def inspect(handle: int, extra: object) -> None:
-            if not win32gui.IsWindowVisible(handle):
+            if not include_hidden and not win32gui.IsWindowVisible(handle):
                 return
             title = win32gui.GetWindowText(handle)
             if title not in {"微信", "Weixin", "WeChat"}:
@@ -152,8 +152,18 @@ class QtAccess:
             control.ClassName.startswith("mmui::MainWindow") for control in controls
         )
 
-    def enable(self, notify: Callable[[str], None]) -> None:
-        window, process_id = self._window()
+    def enable(self, notify: Callable[[str], None], restore: bool = False) -> None:
+        window, process_id = self._window(include_hidden=restore)
+        if restore and (
+            not win32gui.IsWindowVisible(window) or win32gui.IsIconic(window)
+        ):
+            # Only foreground original downloads opt in to restoring a tray window.
+            win32gui.ShowWindow(window, win32con.SW_RESTORE)
+            deadline = monotonic() + 2
+            while not win32gui.IsWindowVisible(window) and monotonic() < deadline:
+                sleep(0.05)
+            if not win32gui.IsWindowVisible(window):
+                raise ValueError("Cannot restore the WeChat main window")
         if self.has_tree(window):
             return
         root = uiautomation.ControlFromHandle(window)
