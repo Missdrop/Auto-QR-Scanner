@@ -194,5 +194,5 @@ class WeChatTest(unittest.TestCase):
             self.wechat._run(["Chat"], self.received.append, self.notices.append)
         process.terminate.assert_called_once()
         context.Event.return_value.set.assert_called_once()
-        self.assertEqual(context.Queue.return_value.close.call_count, 2)
+        self.assertEqual(context.Queue.return_value.close.call_count, 1)
         self.assertEqual(self.notices[-1], "Monitoring stopped")

@@ -22,14 +22,6 @@ class WeChat:
         self._stop = Event()
         self._thread: Thread | None = None
         self._seen: set[str] = set()
-        self._feedback: Any = None
-
-    def decoded(self, message_id: str) -> None:
-        if self._feedback is not None:
-            try:
-                self._feedback.put_nowait(message_id)
-            except (OSError, ValueError):
-                pass
 
     def start(
         self,
@@ -39,6 +31,7 @@ class WeChat:
         latest_only: bool = False,
         download_originals: bool = False,
         image_mode: str | None = None,
+        image_modes: list[str] | None = None,
     ) -> None:
         if self._thread is not None and self._thread.is_alive():
             raise ValueError("Monitoring is already running")
@@ -49,10 +42,23 @@ class WeChat:
         self._image_mode = image_mode or (
             "original" if download_originals else "thumbnail"
         )
+        self._image_modes = image_modes
+        if image_modes is not None and (
+            not image_modes
+            or any(
+                mode not in {"thumbnail", "compressed", "original"}
+                for mode in image_modes
+            )
+        ):
+            raise ValueError("Select at least one valid image source")
         if self._image_mode not in {"thumbnail", "compressed", "original"}:
             raise ValueError("Unknown image source mode")
         self._stop.clear()
-        self._download_originals = self._image_mode == "original"
+        self._download_originals = (
+            "original" in image_modes
+            if image_modes is not None
+            else self._image_mode == "original"
+        )
         self._seen.clear()
         self._thread = Thread(
             target=self._run,
@@ -85,7 +91,6 @@ class WeChat:
 
         context = multiprocessing.get_context("spawn")
         output = context.Queue(maxsize=128)
-        self._feedback = context.Queue()
         stopped = context.Event()
         process = context.Process(
             target=read_database,
@@ -95,9 +100,10 @@ class WeChat:
                 latest_only,
                 output,
                 stopped,
-                self._feedback,
+                None,
                 getattr(self, "_download_originals", False),
                 getattr(self, "_image_mode", None),
+                getattr(self, "_image_modes", None),
             ),
             name="wechat-database",
             daemon=False,
@@ -132,9 +138,6 @@ class WeChat:
                 process.close()
             output.close()
             output.cancel_join_thread()
-            self._feedback.close()
-            self._feedback.cancel_join_thread()
-            self._feedback = None
             notify(stopped_message)
 
     def _run_ui(

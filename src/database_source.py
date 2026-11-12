@@ -23,8 +23,8 @@ class DatabasePhoto:
         if sender:
             self.attr = "self" if sender == source.db.wxid else "friend"
 
-    def download(self) -> Path:
-        path = self._source.image(self.user, self.row)
+    def download(self, mode: str | None = None) -> Path:
+        path = self._source.image(self.user, self.row, mode)
         self.image_kind = self._source.image_kind
         return path
 
@@ -74,7 +74,9 @@ class DatabaseSource:
         rows = self.db.get_new_messages(user, since_seq=sequence, limit=200)
         return [DatabasePhoto(self, user, row) for row in rows]
 
-    def image(self, user: str, row: dict[str, Any]) -> Path:
+    def image(
+        self, user: str, row: dict[str, Any], exact_mode: str | None = None
+    ) -> Path:
         thumbnail_only = getattr(self, "thumbnail_only", False)
         mode = (
             "thumbnail" if thumbnail_only else getattr(self, "image_mode", "original")
@@ -103,7 +105,21 @@ class DatabaseSource:
             elif "mid" in files:
                 tier = "mid"
         target = files.get(tier)
-        if mode == "compressed":
+        if exact_mode is not None:
+            tier = {"thumbnail": "thumb", "compressed": "mid", "original": "original"}[
+                exact_mode
+            ]
+            target = files.get(tier)
+            arguments["tier"] = tier
+            if (
+                tier == "original"
+                and target
+                and not self.media.original_ready(
+                    target[1], (files.get("mid") or (None, 0))[1]
+                )
+            ):
+                target = None
+        elif mode == "compressed":
             arguments["tier"] = tier
         if not target:
             raise FileNotFoundError("WeChat has not cached this image yet")

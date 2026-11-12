@@ -26,7 +26,6 @@ class Worker:
         self._notify = notify
         self._queue: Queue[tuple[ImageMessage, bool]] = Queue(maxsize=64)
         self._stop = Event()
-        self._decoded: set[str] = set()
         self._thread = Thread(target=self._run, name="image-scanner", daemon=True)
         self._thread.start()
 
@@ -49,13 +48,7 @@ class Worker:
             except Empty:
                 continue
             try:
-                if automatic and message.message_id in self._decoded:
-                    continue
                 result = self._scanner.scan(message)
-                if result.codes:
-                    if len(self._decoded) >= 4096:
-                        self._decoded.clear()
-                    self._decoded.add(message.message_id)
                 self._history.save(result)
                 self._completed(result, automatic)
             except Exception as exception:
