@@ -8,9 +8,15 @@ class ImageMessage:
     """
 
     def __init__(
-        self, message_id: str, chat_name: str, image_path: Path, received_at: datetime
+        self,
+        message_id: str,
+        chat_name: str,
+        image_path: Path,
+        received_at: datetime,
+        image_kind: str = "unknown",
     ) -> None:
         self.message_id = message_id
         self.chat_name = chat_name
         self.image_path = image_path
         self.received_at = received_at
+        self.image_kind = image_kind

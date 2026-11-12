@@ -4,11 +4,11 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QResizeEvent
 from PySide6.QtWidgets import (
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPlainTextEdit,
     QSizePolicy,
-    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -83,24 +83,19 @@ class Details(QWidget):
         form.addRow("识别提示", self._warning)
 
         image = QWidget()
+        image.setFixedWidth(300)
         image_layout = QVBoxLayout(image)
         image_layout.addWidget(QLabel("图片"))
         self._preview = ImagePreview()
         image_layout.addWidget(self._preview, 1)
-        self._filename = QLabel()
-        self._filename.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse
-        )
-        self._filename.setWordWrap(True)
+        self._filename = QLineEdit()
+        self._filename.setReadOnly(True)
+        self._filename.setMinimumWidth(0)
         image_layout.addWidget(self._filename)
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(fields)
-        splitter.addWidget(image)
-        splitter.setStretchFactor(0, 2)
-        splitter.setStretchFactor(1, 1)
-        layout = QVBoxLayout(self)
+        layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(splitter)
+        layout.addWidget(fields, 1)
+        layout.addWidget(image)
 
     @staticmethod
     def _field(form: QFormLayout, title: str) -> QLineEdit:

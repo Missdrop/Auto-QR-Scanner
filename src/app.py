@@ -7,6 +7,7 @@ from PySide6.QtCore import QObject, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication
 
+from .conversation_search import ConversationSearch
 from .history import History
 from .message import ImageMessage
 from .outcome import Outcome
@@ -44,6 +45,9 @@ class App(QObject):
         self._history = history
         self._window = window
         self._image_directory = student_directory.parent / "images"
+        self._conversation_search = ConversationSearch(
+            student_directory.parent / "wechat"
+        )
         self._student = Student(
             student_directory, self.student_notice.emit, self.platform_completed.emit
         )
@@ -57,6 +61,13 @@ class App(QObject):
             window.add_result(result)
 
     def _connect_actions(self) -> None:
+        self._window.conversation_query_requested.connect(
+            self._conversation_search.request
+        )
+        self._conversation_search.ready.connect(
+            self._window.show_conversation_candidates
+        )
+        self._conversation_search.failed.connect(self.notice.emit)
         self.completed.connect(self._show_result)
         self.notice.connect(self._show_notice)
         self.student_notice.connect(self._show_student_notice)
@@ -70,6 +81,7 @@ class App(QObject):
         self._window.login_requested.connect(self._open_login)
         self._window.image_folder_requested.connect(self._open_image_folder)
         self._window.student_open_requested.connect(self._open_student)
+        self._window.link_open_requested.connect(self._open_link)
         self._window.closing.connect(self.close)
 
     def _open_image_folder(self) -> None:
@@ -153,6 +165,12 @@ class App(QObject):
         except (ValueError, OSError) as exception:
             self.student_notice.emit(str(exception))
 
+    def _open_link(self, url: str) -> None:
+        try:
+            self._student.open_link(url)
+        except (ValueError, OSError) as exception:
+            self.student_notice.emit(str(exception))
+
     def _open_student(self, url: str) -> None:
         try:
             self._student.open(url)
@@ -163,6 +181,7 @@ class App(QObject):
         if self._closed:
             return
         self._closed = True
+        self._conversation_search.close()
         self._wechat.stop()
         while self._wechat.is_running():
             # The backend destructor queries native windows on the worker thread.

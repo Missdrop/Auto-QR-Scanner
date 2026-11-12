@@ -90,6 +90,16 @@ class Student:
         elif url is not None:
             self._outcome(Outcome(url, "opened"))
 
+    def open_link(self, url: str) -> None:
+        if self._closed:
+            raise ValueError("The student browser has been closed")
+        if not self.is_web_url(url):
+            raise ValueError("Only HTTP or HTTPS links can open in the browser")
+        if self._processing.locked():
+            self._notify("Wait for the Chromium request before opening Student login")
+            return
+        self._browser.open(url)
+
     def _enqueue(self, url: str, token: str) -> None:
         with self._queue_lock:
             if len(self._pending) >= 64:

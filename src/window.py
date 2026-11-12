@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QMainWindow,
-    QPlainTextEdit,
     QPushButton,
     QSplitter,
     QTableWidget,
@@ -19,6 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .conversation_input import ConversationInput
 from .details import Details
 from .language import chinese
 from .outcome import Outcome
@@ -39,6 +39,8 @@ class Window(QMainWindow):
     login_requested = Signal()
     image_folder_requested = Signal()
     student_open_requested = Signal(str)
+    link_open_requested = Signal(str)
+    conversation_query_requested = Signal(str)
     closing = Signal()
 
     def __init__(self, settings: QSettings | None = None) -> None:
@@ -51,8 +53,11 @@ class Window(QMainWindow):
         self.setWindowTitle("Auto QR Scanner")
         self.resize(1180, 760)
 
-        self._groups = QPlainTextEdit()
-        self._groups.setPlaceholderText("填写精确群名或联系人名称，每行一个")
+        self._groups = ConversationInput()
+        self._groups.query_requested.connect(self.conversation_query_requested.emit)
+        self._groups.setPlaceholderText(
+            "输入群名或联系人选择候选，每行一个；也可直接填写精确名称"
+        )
         self._groups.setPlainText(str(self._settings.value("groups", "")))
         self._groups.setMaximumHeight(100)
         self._automatic = QCheckBox("识别后自动扫码")
@@ -69,7 +74,7 @@ class Window(QMainWindow):
         self.setCentralWidget(self._create_layout())
 
     def _create_table(self) -> QTableWidget:
-        table = QTableWidget(0, 6)
+        table = QTableWidget(0, 7)
         table.setHorizontalHeaderLabels(
             [
                 "收到时间",
@@ -78,13 +83,14 @@ class Window(QMainWindow):
                 "二维码内容",
                 "识别耗时（毫秒）",
                 "扫码结果",
+                "图片类型",
             ]
         )
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        for column in (2, 4, 5):
+        for column in (2, 4, 5, 6):
             table.horizontalHeader().setSectionResizeMode(
                 column, QHeaderView.ResizeMode.ResizeToContents
             )
@@ -124,7 +130,7 @@ class Window(QMainWindow):
         actions = QHBoxLayout()
         self._button("复制内容", self._copy_content, actions)
         self._button("打开链接", self._open_link, actions)
-        self._button("在内置浏览器扫码", self._open_student, actions)
+        self._button("重新扫码", self._open_student, actions)
         self._button("重新识别并处理", self._retry, actions)
         layout.addLayout(actions)
         layout.addWidget(self._status)
@@ -148,6 +154,9 @@ class Window(QMainWindow):
 
     def automatic_open(self) -> bool:
         return self._automatic.isChecked()
+
+    def show_conversation_candidates(self, query: str, rows: list) -> None:
+        self._groups.show_candidates(query, rows)
 
     def download_originals(self) -> bool:
         return self._originals.isChecked()
@@ -180,6 +189,9 @@ class Window(QMainWindow):
                 text,
                 f"{result.elapsed_ms:.0f}",
                 self._outcomes[text].label() if text in self._outcomes else "未提交",
+                {"thumbnail": "缩略图", "original": "原图", "compressed": "压缩图"}.get(
+                    result.message.image_kind, "未知"
+                ),
             ]
             for column, value in enumerate(columns):
                 self._table.setItem(0, column, QTableWidgetItem(value))
@@ -218,7 +230,7 @@ class Window(QMainWindow):
         selected = self._selection()
         if selected is None:
             return
-        self.student_open_requested.emit(selected[1])
+        self.link_open_requested.emit(selected[1])
 
     def _open_student(self) -> None:
         selected = self._selection()

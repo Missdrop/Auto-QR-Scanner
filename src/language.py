@@ -8,6 +8,9 @@ def chinese(message: str) -> str:
             "当前为低分辨率图片，正在等待更清晰的缓存版本"
         ),
         "Ready": "就绪",
+        "Conversation suggestions unavailable; enter a name manually": (
+            "后台候选读取失败，仍可手动填写精确会话名称"
+        ),
         "Close the built-in browser before background processing": (
             "请先关闭内置浏览器窗口，再重试后台扫码；登录状态会保留"
         ),

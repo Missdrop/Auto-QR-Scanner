@@ -53,7 +53,14 @@ class DatabaseReader:
         self._images.mkdir(parents=True, exist_ok=True)
         destination = self._images / (uuid4().hex + source.suffix)
         shutil.copyfile(source, destination)
-        message = ImageMessage(photo.id, name, destination, datetime.now().astimezone())
+        kind = getattr(photo, "image_kind", "unknown")
+        message = ImageMessage(
+            photo.id,
+            name,
+            destination,
+            datetime.now().astimezone(),
+            kind if isinstance(kind, str) else "unknown",
+        )
         self._output.put(("image", message))
 
     def run(self, names: list[str], latest_only: bool) -> None:
