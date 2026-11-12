@@ -70,3 +70,14 @@ class ScannerTest(unittest.TestCase):
         self.path.write_bytes(b"not an image")
         message = ImageMessage("invalid", "Test", self.path, datetime.now())
         self.assertEqual(self.scanner.scan(message).status(), "Failed")
+
+    def test_empty_file_is_reported_as_failure(self) -> None:
+        self.path.write_bytes(b"")
+        message = ImageMessage("empty", "Test", self.path, datetime.now())
+        self.assertEqual(self.scanner.scan(message).status(), "Failed")
+
+    def test_pixel_limit_is_enforced(self) -> None:
+        self.scanner = Scanner(ImageProcessor(max_pixels=100))
+        result = self.scan_image(make_code("too large"))
+        self.assertEqual(result.status(), "Failed")
+        self.assertIn("pixel limit", result.error)

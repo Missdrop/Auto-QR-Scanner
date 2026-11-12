@@ -64,5 +64,5 @@ class WeChatTest(unittest.TestCase):
         client.GetAllMessage.return_value = [old]
         self.wechat._stop.set()
         self.wechat._poll(client, ["Group"], self.received.append, self.notices.append)
-        self.assertIn("old", self.wechat._seen)
+        self.assertIn("Group:old", self.wechat._seen)
         self.assertEqual(self.received, [])

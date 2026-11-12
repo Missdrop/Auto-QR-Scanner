@@ -1,5 +1,5 @@
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -39,7 +39,7 @@ class History:
             """)
 
     @contextmanager
-    def _connect(self) -> Iterator[sqlite3.Connection]:
+    def _connect(self) -> Generator[sqlite3.Connection]:
         connection = sqlite3.connect(self._database_path, timeout=10)
         connection.execute("PRAGMA foreign_keys = ON")
         try:

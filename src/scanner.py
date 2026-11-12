@@ -1,5 +1,6 @@
 from time import perf_counter
 
+import cv2
 import zxingcpp
 
 from .image_processor import ImageProcessor
@@ -32,7 +33,7 @@ class Scanner:
                 )
                 for barcode in decoded:
                     codes.setdefault(barcode.text, Code(barcode.text))
-        except (OSError, ValueError, RuntimeError) as exception:
+        except (OSError, ValueError, RuntimeError, cv2.error) as exception:
             error = str(exception)
 
         elapsed_ms = (perf_counter() - started) * 1000
