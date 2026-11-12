@@ -17,3 +17,6 @@ Thumbs.db
 .ruff_cache/
 .pytest_cache/
 tmp/
+
+browser_extension.crx
+browser_extension.pem

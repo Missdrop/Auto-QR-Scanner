@@ -21,8 +21,12 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
             await chrome.storage.local.set({ pairing: message.code });
             return deliver({ event: "ping" });
         }
-        const source = new URL(sender.tab?.url || "https://invalid.local/");
-        if (message.type !== "event" || source.origin !== "https://ams.xjtlu.edu.cn") {
+        // MessageSender.url identifies the sending frame without the broad tabs permission.
+        const source = new URL(sender.url || "https://invalid.local/");
+        const studentPath = source.pathname.startsWith("/studenth5/")
+            || source.pathname.startsWith("/studentpc/");
+        if (message.type !== "event" || !sender.tab || !studentPath
+            || source.origin !== "https://ams.xjtlu.edu.cn") {
             throw new Error("Only AMS tabs can send session events.");
         }
         return deliver(message.payload);
