@@ -4,10 +4,11 @@ version = "0.1.0"
 requires-python = ">=3.12,<3.13"
 readme = "README.md"
 dependencies = [
+    "dfindexeddb==20260210",
     "numpy>=2.2,<3",
     "opencv-python>=4.11,<5",
+    "playwright>=1.58,<2",
     "pyside6-essentials>=6.8,<6.9",
-    "pywebview>=6,<7",
     "zxing-cpp>=3.1.1",
 ]
 
@@ -34,3 +35,6 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pyrefly]
 project-includes = ["src"]
+
+[tool.uv]
+override-dependencies = ["python-snappy>=0.7.3,<1"]

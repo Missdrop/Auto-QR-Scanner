@@ -67,7 +67,6 @@ class App(QObject):
         self._window.files_requested.connect(self._scan_files)
         self._window.retry_requested.connect(self._worker.submit)
         self._window.login_requested.connect(self._open_login)
-        self._window.pairing_requested.connect(self._copy_pairing_code)
         self._window.student_open_requested.connect(self._open_student)
         self._window.closing.connect(self.close)
 
@@ -113,17 +112,6 @@ class App(QObject):
             for code in result.codes:
                 if not code.duplicate and Student.is_student_url(code.text):
                     self._open_student(code.text)
-
-    def _copy_pairing_code(self) -> None:
-        try:
-            QApplication.clipboard().setText(self._student.pairing_code())
-            self.student_notice.emit(
-                "Pairing code copied; paste it into the companion popup"
-            )
-        except OSError:
-            self.student_notice.emit(
-                "Cannot start the local bridge; close other app instances"
-            )
 
     def _open_login(self) -> None:
         try:

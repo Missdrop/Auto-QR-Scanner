@@ -16,7 +16,7 @@ HOME_URL = "https://ams.xjtlu.edu.cn/studenth5/"
 
 class Student:
     """
-    Receive student sessions from the companion extension over authenticated loopback.
+    Receive sessions from the integrated login window over authenticated loopback.
 
     Login stays in the normal browser. QR results come from the existing AMS HTTPS
     endpoint. Session values use Windows DPAPI; passwords are never read.
@@ -25,7 +25,7 @@ class Student:
     def __init__(self, directory: Path, notify: Callable[[str], None]) -> None:
         directory.mkdir(parents=True, exist_ok=True)
         self._notify = notify
-        self._browser = Browser()
+        self._browser = Browser(directory)
         self._ams = Ams()
         self._processing = Lock()
         self._request_thread: Thread | None = None
@@ -34,7 +34,7 @@ class Student:
         self._lock = Lock()
         self._server: ThreadingHTTPServer | None = None
         self._thread: Thread | None = None
-        self._key = self._load_key(directory / "pairing.key")
+        self._key = self._load_key(directory / "login.key")
         self.port = 52841
 
     @staticmethod
@@ -58,10 +58,6 @@ class Student:
         )
         self._thread.start()
 
-    def pairing_code(self) -> str:
-        self.start()
-        return f"{self.port}:{self._key}"
-
     def open(self, url: str = HOME_URL) -> None:
         if not self.is_student_url(url):
             raise ValueError("Only HTTPS XJTLU AMS student URLs can open automatically")
@@ -69,7 +65,7 @@ class Student:
         with self._lock:
             student = dict(self._session)
         if url != HOME_URL and not student:
-            self._notify("Login required: pair the browser companion and sign in")
+            self._notify("Login required: open Student login and sign in")
             return
 
         if url != HOME_URL:
@@ -88,7 +84,7 @@ class Student:
             )
             self._request_thread.start()
             return
-        self._notify("Complete student login in your normal paired browser")
+        self._notify("Complete student login in the integrated login window")
         if not self._browser.open(url):
             self._notify("Cannot open the student page; check the installed browser")
 
@@ -149,17 +145,13 @@ class Student:
             self._notify("Student session available; platform validates it on use")
             return
 
-        if event == "ping":
-            self._notify("Browser companion connected. " + self.status())
+        if event == "login-unavailable":
+            self._notify("Close the student login window and reopen Student login")
         elif event == "logout":
             with self._lock:
                 self._store.save({})
                 self._session = {}
             self._notify("Login required: student session expired or was cleared")
-        elif event == "success":
-            self._notify("The platform displayed its success page")
-        elif event == "failure":
-            self._notify("Platform did not confirm success; inspect the browser")
         else:
             raise ValueError("Unknown browser event")
 
@@ -171,12 +163,10 @@ class Student:
                 super().setup()
                 self.connection.settimeout(2)
 
-            def do_OPTIONS(self) -> None:
-                self.send_response(204)
-                self._cors()
-                self.end_headers()
-
             def do_POST(self) -> None:
+                if self.headers.get("Origin"):
+                    self.send_error(403)
+                    return
                 if self.path != "/event":
                     self.send_error(404)
                     return
@@ -196,17 +186,7 @@ class Student:
                     self.send_error(400)
                     return
                 self.send_response(204)
-                self._cors()
                 self.end_headers()
-
-            def _cors(self) -> None:
-                origin = self.headers.get("Origin", "")
-                if origin.startswith("chrome-extension://"):
-                    self.send_header("Access-Control-Allow-Origin", origin)
-                    self.send_header(
-                        "Access-Control-Allow-Headers", "Authorization, Content-Type"
-                    )
-                    self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
 
             def log_message(self, format: str, *args: object) -> None:
                 # Never log student tokens, request bodies or authenticated URLs.
