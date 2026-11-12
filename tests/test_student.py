@@ -30,7 +30,7 @@ class StudentTest(unittest.TestCase):
         )
         return urlopen(request, timeout=2)
 
-    def test_wrong_pairing_key_cannot_write_session(self) -> None:
+    def test_wrong_login_key_cannot_write_session(self) -> None:
         with self.assertRaises(HTTPError) as failure:
             self.send(
                 {"event": "session", "userId": "student", "token": "secret"}, "wrong"
@@ -133,7 +133,5 @@ class StudentTest(unittest.TestCase):
             {"event": "session", "userId": "student", "token": "secret"}
         )
         self.assertNotIn("success page", self.messages[-1])
-        self.student._receive({"event": "failure"})
-        self.assertIn("did not confirm", self.messages[-1])
-        self.student._receive({"event": "success"})
-        self.assertIn("success page", self.messages[-1])
+        with self.assertRaises(ValueError):
+            self.student._receive({"event": "success"})

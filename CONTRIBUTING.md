@@ -8,7 +8,6 @@ uv run --extra wechat ruff check .
 uv run --extra wechat ruff format --check .
 uv run --extra wechat pyrefly check
 uv run --extra wechat python -W error::ResourceWarning -m unittest discover -s tests -v
-node --test tests/extension.test.cjs
 ```
 
 Use ordinary classes with explicit constructors. Organize concrete operations through composition. Keep names clear, methods focused and control flow shallow. Separate logical steps with blank lines and useful English comments. Use English identifiers, comments and program output, and add necessary type annotations.

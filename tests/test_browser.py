@@ -6,23 +6,26 @@ from src.browser import Browser
 
 
 class BrowserTest(unittest.TestCase):
-    def test_installed_chrome_receives_the_complete_url(self):
-        url = "https://ams.xjtlu.edu.cn/studenth5/#/?state=test&token=example"
-        executable = Path("C:/Chrome/chrome.exe")
-        with (
-            patch.object(Browser, "executable", return_value=executable),
-            patch("src.browser.webbrowser.BackgroundBrowser") as chrome,
-            patch("src.browser.webbrowser.open") as default,
-        ):
-            chrome.return_value.open.return_value = True
-            self.assertTrue(Browser().open(url))
-        chrome.assert_called_once_with(str(executable))
-        chrome.return_value.open.assert_called_once_with(url, new=2)
-        default.assert_not_called()
+    def setUp(self):
+        runtime = patch(
+            "src.browser.Chromium.executable", return_value=Path("runtime.exe")
+        )
+        runtime.start()
+        self.addCleanup(runtime.stop)
 
-    def test_default_browser_failure_is_reported(self):
-        with (
-            patch.object(Browser, "executable", return_value=None),
-            patch("src.browser.webbrowser.open", return_value=False),
-        ):
-            self.assertFalse(Browser().open("https://example.com"))
+    def test_login_process_does_not_receive_credentials_in_arguments(self):
+        with patch("src.browser.subprocess.Popen") as start:
+            browser = Browser(Path("data/student"))
+            self.assertTrue(browser.open("https://ams.xjtlu.edu.cn/studenth5/"))
+        arguments = start.call_args.args[0]
+        self.assertIn("src.login", arguments)
+        self.assertNotIn("token", " ".join(arguments))
+        self.assertEqual(arguments[-1], str(Path("data/student")))
+
+    def test_an_existing_login_window_is_reused(self):
+        with patch("src.browser.subprocess.Popen") as start:
+            start.return_value.poll.return_value = None
+            browser = Browser(Path("data/student"))
+            browser.open("https://ams.xjtlu.edu.cn/studenth5/")
+            browser.open("https://ams.xjtlu.edu.cn/studenth5/")
+        start.assert_called_once()

@@ -1,26 +1,28 @@
-import os
-import webbrowser
+import subprocess
+import sys
 from pathlib import Path
+
+from .runtime import Chromium
 
 
 class Browser:
     """
-    Open AMS in the installed Chrome profile used by the companion extension.
+    Run the managed persistent Chromium login window.
     """
 
-    @staticmethod
-    def executable() -> Path | None:
-        for location in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
-            directory = os.environ.get(location)
-            if directory:
-                path = Path(directory) / "Google/Chrome/Application/chrome.exe"
-                if path.is_file():
-                    return path
-        return None
+    def __init__(self, directory: Path) -> None:
+        self._directory = directory
+        self._process: subprocess.Popen | None = None
 
     def open(self, url: str) -> bool:
-        executable = self.executable()
-        if executable is not None:
-            # Pass the complete hash URL as one argument, without a shell handler.
-            return webbrowser.BackgroundBrowser(str(executable)).open(url, new=2)
-        return webbrowser.open(url, new=2)
+        if self._process is not None and self._process.poll() is None:
+            return True
+        Chromium().executable()
+        self._process = subprocess.Popen(
+            [sys.executable, "-m", "src.login", "--data", str(self._directory)],
+            cwd=Path(__file__).resolve().parent.parent,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return True

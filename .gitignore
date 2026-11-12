@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 .venv/
+.runtimes/
 venv/
 .env
 .env.*
@@ -17,6 +18,3 @@ Thumbs.db
 .ruff_cache/
 .pytest_cache/
 tmp/
-
-browser_extension.crx
-browser_extension.pem
