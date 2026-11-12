@@ -133,6 +133,38 @@ class AppTest(unittest.TestCase):
                 controller.close()
                 window.close()
 
+    def test_another_image_version_does_not_replay_a_failed_request(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            window = Window(
+                QSettings(str(root / "settings.ini"), QSettings.Format.IniFormat)
+            )
+            history = History(root / "history.sqlite3")
+            controller = App(
+                WeChat(root / "images"),
+                Scanner(ImageProcessor()),
+                history,
+                window,
+                root / "profile",
+            )
+            url = "https://example.com/qr"
+            result = ScanResult(
+                ImageMessage("one", "Chat", root / "image.jpg", datetime.now()),
+                [Code(url)],
+            )
+            try:
+                for status in ["error", "login", "cancelled", "queued", "result"]:
+                    history.save_outcome(Outcome(url, status))
+                    with patch.object(controller._student, "open") as open_browser:
+                        controller._show_result(result, True)
+                        open_browser.assert_not_called()
+                with patch.object(controller._student, "open") as open_browser:
+                    controller._open_student(url)
+                    open_browser.assert_called_once_with(url)
+            finally:
+                controller.close()
+                window.close()
+
     def test_image_modes_can_be_combined_and_saved(self):
         with tempfile.TemporaryDirectory() as directory:
             settings = QSettings(
@@ -140,19 +172,76 @@ class AppTest(unittest.TestCase):
             )
             settings.setValue("image_mode", "original")
             settings.setValue("image_modes", ["original"])
+            settings.setValue("image_defaults_updated", True)
             window = Window(settings)
             self.assertTrue(window.automatic_open())
             self.assertEqual(window.image_modes(), ["thumbnail", "compressed"])
-            self.assertFalse(window.download_originals())
-            window._image_modes["original"].setChecked(True)
-            self.assertEqual(
-                window.image_modes(), ["thumbnail", "compressed", "original"]
-            )
-            self.assertTrue(window.download_originals())
-            self.assertTrue(window._image_modes["original"].isChecked())
+            self.assertNotIn("original", window._image_modes)
+            window._image_modes["thumbnail"].setChecked(False)
+            self.assertEqual(window.image_modes(), ["compressed"])
             window.close()
             restored = Window(settings)
-            self.assertEqual(
-                restored.image_modes(), ["thumbnail", "compressed", "original"]
+            self.assertEqual(restored.image_modes(), ["compressed"])
+            restored.close()
+
+    def test_empty_saved_sources_restore_usable_defaults(self):
+        with tempfile.TemporaryDirectory() as directory:
+            settings = QSettings(
+                str(Path(directory) / "settings.ini"), QSettings.Format.IniFormat
             )
+            settings.setValue("image_defaults_updated", True)
+            settings.setValue("image_modes", [])
+            window = Window(settings)
+            try:
+                self.assertEqual(window.image_modes(), ["thumbnail", "compressed"])
+                self.assertEqual(set(window._image_modes), {"thumbnail", "compressed"})
+            finally:
+                window.close()
+
+    def test_address_filter_blocks_automatic_requests_and_persists(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            settings = QSettings(str(root / "settings.ini"), QSettings.Format.IniFormat)
+            window = Window(settings)
+            history = History(root / "history.sqlite3")
+            controller = App(
+                WeChat(root / "images"),
+                Scanner(ImageProcessor()),
+                history,
+                window,
+                root / "profile",
+            )
+            allowed = "https://example.com/qr/one"
+            blocked = "https://other.example/qr"
+            result = ScanResult(
+                ImageMessage("one", "Chat", root / "image.jpg", datetime.now()),
+                [Code(allowed), Code(blocked)],
+            )
+            try:
+                window._addresses.setPlainText("https://example.com/qr/")
+                with patch.object(controller._student, "open") as open_browser:
+                    controller._show_result(result, True)
+                    open_browser.assert_called_once_with(allowed)
+                self.assertEqual(history.outcome(blocked).status, "filtered")
+                self.assertEqual(history.outcome(blocked).label(), "已被地址过滤")
+                window._addresses.clear()
+                with patch.object(controller._student, "open") as open_browser:
+                    controller._show_result(result, True)
+                    self.assertEqual(open_browser.call_count, 2)
+                history.save_outcome(Outcome(blocked, "result", 0))
+                window._addresses.setPlainText("example.com")
+                with patch.object(controller._student, "open"):
+                    controller._show_result(result, True)
+                self.assertEqual(history.outcome(blocked).code, 0)
+                window._addresses.setPlainText("https://")
+                with patch.object(controller._wechat, "start") as start:
+                    controller._start_monitoring(["Chat"])
+                    start.assert_not_called()
+                window._addresses.setPlainText("example.com\nsecond.example")
+            finally:
+                controller.close()
+                window.close()
+            restored = Window(settings)
+            self.assertTrue(restored.address_filter().allows("https://second.example/"))
+            self.assertFalse(restored.address_filter().allows("https://other.example/"))
             restored.close()

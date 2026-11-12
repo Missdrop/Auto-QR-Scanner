@@ -29,7 +29,6 @@ class WeChat:
         receive: Callable[[ImageMessage], None],
         notify: Callable[[str], None],
         latest_only: bool = False,
-        download_originals: bool = False,
         image_mode: str | None = None,
         image_modes: list[str] | None = None,
     ) -> None:
@@ -39,26 +38,16 @@ class WeChat:
         if not names:
             raise ValueError("Enter at least one exact group name")
 
-        self._image_mode = image_mode or (
-            "original" if download_originals else "thumbnail"
-        )
+        self._image_mode = image_mode or "thumbnail"
         self._image_modes = image_modes
         if image_modes is not None and (
             not image_modes
-            or any(
-                mode not in {"thumbnail", "compressed", "original"}
-                for mode in image_modes
-            )
+            or any(mode not in {"thumbnail", "compressed"} for mode in image_modes)
         ):
             raise ValueError("Select at least one valid image source")
-        if self._image_mode not in {"thumbnail", "compressed", "original"}:
+        if self._image_mode not in {"thumbnail", "compressed"}:
             raise ValueError("Unknown image source mode")
         self._stop.clear()
-        self._download_originals = (
-            "original" in image_modes
-            if image_modes is not None
-            else self._image_mode == "original"
-        )
         self._seen.clear()
         self._thread = Thread(
             target=self._run,
@@ -101,7 +90,6 @@ class WeChat:
                 output,
                 stopped,
                 None,
-                getattr(self, "_download_originals", False),
                 getattr(self, "_image_mode", None),
                 getattr(self, "_image_modes", None),
             ),
@@ -116,6 +104,11 @@ class WeChat:
                     event, value = output.get(timeout=0.2)
                 except Empty:
                     if not process.is_alive():
+                        if process.exitcode not in {None, 0}:
+                            stopped_message = (
+                                "Monitoring stopped: "
+                                "Background process exited unexpectedly"
+                            )
                         break
                     continue
                 if event == "image":

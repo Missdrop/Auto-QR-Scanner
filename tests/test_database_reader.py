@@ -8,21 +8,70 @@ from src.database_reader import DatabaseReader
 
 
 class DatabaseReaderTest(unittest.TestCase):
+    def test_failed_copy_is_retried_instead_of_marked_delivered(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            image = root / "photo.jpg"
+            image.write_bytes(b"image")
+            photo = Mock()
+            photo.id = "one"
+            output = Mock()
+            reader = DatabaseReader(root / "images", output, Mock())
+            with patch("src.database_reader.shutil.copyfile", side_effect=OSError):
+                with self.assertRaises(OSError):
+                    reader._deliver_source("Chat", photo, image, "one:compressed")
+            reader._deliver_source("Chat", photo, image, "one:compressed")
+            output.put.assert_called_once()
+
+    def test_finished_versions_are_released(self):
+        reader = DatabaseReader(Path("unused"), Mock(), Mock())
+        reader._image_modes = ["thumbnail", "compressed"]
+        reader._versions = {
+            "one:thumbnail": "a",
+            "one:compressed": "b",
+            "two:compressed": "c",
+        }
+        photo = Mock()
+        photo.id = "one"
+        reader._forget(photo)
+        self.assertEqual(reader._versions, {"two:compressed": "c"})
+
+    def test_missing_selected_version_is_reported_when_wait_expires(self):
+        photo = Mock()
+        photo.id, photo.type, photo.attr = "one", "image", "friend"
+        photo.row = {"sort_seq": 1}
+        photo.download.side_effect = FileNotFoundError
+        source = Mock()
+        source.resolve.return_value = "user"
+        source.latest.return_value = [photo]
+        stopped, output = Mock(), Mock()
+        stopped.wait.return_value = False
+        stopped.is_set.return_value = False
+        reader = DatabaseReader(Path("unused/images"), output, stopped)
+        reader._image_modes = ["compressed"]
+        with (
+            patch("src.database_reader.DatabaseSource", return_value=source),
+            patch("src.database_reader.monotonic", side_effect=[0, 61]),
+        ):
+            reader.run(["Chat"], True)
+        notices = [call.args[0][1] for call in output.put.call_args_list]
+        self.assertTrue(any("Selected image versions" in notice for notice in notices))
+
     def test_every_selected_version_is_emitted_even_after_success_feedback(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            thumb, original = root / "thumb.jpg", root / "original.jpg"
+            thumb, compressed = root / "thumb.jpg", root / "compressed.jpg"
             thumb.write_bytes(b"thumbnail")
-            original.write_bytes(b"original")
+            compressed.write_bytes(b"compressed")
             photo = Mock()
             photo.id = "one"
             feedback, output = Queue(), Mock()
             reader = DatabaseReader(root / "images", output, Mock(), feedback)
-            reader._image_modes = ["thumbnail", "original"]
+            reader._image_modes = ["thumbnail", "compressed"]
 
             def download(mode):
                 photo.image_kind = mode
-                return thumb if mode == "thumbnail" else original
+                return thumb if mode == "thumbnail" else compressed
 
             photo.download.side_effect = download
             reader.deliver("Chat", photo)
@@ -30,20 +79,20 @@ class DatabaseReaderTest(unittest.TestCase):
             reader.deliver("Chat", photo)
             images = [call.args[0][1] for call in output.put.call_args_list]
             self.assertEqual(
-                [value.image_kind for value in images], ["thumbnail", "original"]
+                [value.image_kind for value in images], ["thumbnail", "compressed"]
             )
             self.assertTrue(reader._complete(photo))
 
     def test_new_cached_version_is_delivered_but_identical_bytes_are_not(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            thumb, original = root / "thumb.jpg", root / "original.jpg"
+            thumb, compressed = root / "thumb.jpg", root / "compressed.jpg"
             thumb.write_bytes(b"small-photo")
-            original.write_bytes(b"full-photo")
+            compressed.write_bytes(b"full-photo")
             photo = Mock()
             photo.id, photo.type, photo.attr = "image", "image", "friend"
             photo.row = {"sort_seq": 2}
-            photo.download.side_effect = [thumb, original, original]
+            photo.download.side_effect = [thumb, compressed, compressed]
             old = Mock()
             old.row = {"sort_seq": 1}
             source = Mock()
@@ -65,35 +114,6 @@ class DatabaseReaderTest(unittest.TestCase):
                 [image.image_path.read_bytes() for image in images],
                 [b"small-photo", b"full-photo"],
             )
-
-    def test_download_starts_before_decode_and_success_does_not_cancel_it(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            thumb = root / "thumb.jpg"
-            thumb.write_bytes(b"small-photo")
-            photo = Mock()
-            photo.id, photo.type, photo.attr = "image", "image", "friend"
-            photo.row = {"sort_seq": 2}
-            photo.download.return_value = thumb
-            source = Mock()
-            source.resolve.return_value = "chat-user"
-            source.latest.return_value = [photo]
-            feedback, output, stopped = Queue(), Mock(), Mock()
-            stopped.wait.side_effect = [False, True]
-            stopped.is_set.return_value = False
-            reader = DatabaseReader(root / "images", output, stopped, feedback)
-            reader._downloads = Mock()
-
-            def receive(event):
-                if event[0] == "image":
-                    reader._downloads.submit.assert_called_once()
-                    feedback.put(event[1].message_id)
-
-            output.put.side_effect = receive
-            with patch("src.database_reader.DatabaseSource", return_value=source):
-                reader.run(["chat"], True)
-            self.assertEqual(photo.download.call_count, 2)
-            reader._downloads.cancel.assert_not_called()
 
     def test_new_images_wait_for_cache_without_replaying_baseline(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

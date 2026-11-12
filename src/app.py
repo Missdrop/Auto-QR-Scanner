@@ -92,6 +92,8 @@ class App(QObject):
 
     def _start_monitoring(self, groups: list[str]) -> None:
         try:
+            if self._window.automatic_open():
+                self._window.address_filter()
             self._wechat.start(
                 groups,
                 self.incoming.emit,
@@ -109,6 +111,8 @@ class App(QObject):
 
     def _scan_latest(self, groups: list[str]) -> None:
         try:
+            if self._window.automatic_open():
+                self._window.address_filter()
             self._wechat.start(
                 groups,
                 self.latest_incoming.emit,
@@ -138,14 +142,21 @@ class App(QObject):
         self._window.add_result(result)
         self._window.show_status(f"{result.status()}: {result.message.image_path.name}")
         if automatic:
+            try:
+                addresses = self._window.address_filter()
+            except ValueError as exception:
+                self.notice.emit(str(exception))
+                return
             for code in result.codes:
                 if Student.is_web_url(code.text):
                     previous = self._history.outcome(code.text)
-                    if previous is None or previous.status in {
-                        "error",
-                        "login",
-                        "cancelled",
-                    }:
+                    if not addresses.allows(code.text):
+                        if previous is None or previous.status == "filtered":
+                            self._show_outcome(Outcome(code.text, "filtered"))
+                        continue
+                    # Another image version must not replay an uncertain request.
+                    # Existing attempts can be retried explicitly from the record.
+                    if previous is None or previous.status == "filtered":
                         self._open_student(code.text)
 
     def _show_outcome(self, outcome: Outcome) -> None:

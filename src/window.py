@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QMainWindow,
+    QPlainTextEdit,
     QPushButton,
     QSplitter,
     QTableWidget,
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .address_filter import AddressFilter
 from .conversation_input import ConversationInput
 from .details import Details
 from .language import chinese
@@ -64,13 +66,18 @@ class Window(QMainWindow):
         )
         self._groups.setPlainText(str(self._settings.value("groups", "")))
         self._groups.setMaximumHeight(100)
+        self._addresses = QPlainTextEdit()
+        self._addresses.setPlaceholderText(
+            "每行一个域名或完整网址前缀，例如 example.com 或 https://example.com/qr/；留白允许所有网址"
+        )
+        self._addresses.setPlainText(str(self._settings.value("address_filter", "")))
+        self._addresses.setMaximumHeight(65)
         self._automatic = QCheckBox("识别后自动扫码")
         self._automatic.setChecked(True)
         self._image_modes: dict[str, QCheckBox] = {}
         descriptions = {
             "thumbnail": "使用缩略图：体积小、速度快、清晰度低；只读后台缓存。",
             "compressed": "使用压缩图：微信的普通清晰版本；只读后台缓存。",
-            "original": "使用原图：清晰度最高；未缓存时会短暂打开微信图片窗口下载。",
         }
         # Apply the revised defaults once, then preserve subsequent user choices.
         if not self._settings.value("image_defaults_updated", False, type=bool):
@@ -88,6 +95,9 @@ class Window(QMainWindow):
                 if legacy_mode is not None
                 else ["thumbnail", "compressed"]
             )
+        selected = [mode for mode in selected if mode in descriptions]
+        if not selected:
+            selected = ["thumbnail", "compressed"]
         for mode, description in descriptions.items():
             button = QCheckBox(description)
             self._image_modes[mode] = button
@@ -129,6 +139,10 @@ class Window(QMainWindow):
         layout = QVBoxLayout(widget)
         layout.addWidget(QLabel("微信会话"))
         layout.addWidget(self._groups)
+        layout.addWidget(
+            QLabel("地址过滤（仅限制自动扫码，每行一个，留白允许所有网址）")
+        )
+        layout.addWidget(self._addresses)
 
         controls = QHBoxLayout()
         self._start = self._button("开始监听", self._request_start, controls)
@@ -182,14 +196,11 @@ class Window(QMainWindow):
     def automatic_open(self) -> bool:
         return self._automatic.isChecked()
 
+    def address_filter(self) -> AddressFilter:
+        return AddressFilter(self._addresses.toPlainText())
+
     def show_conversation_candidates(self, query: str, rows: list) -> None:
         self._groups.show_candidates(query, rows)
-
-    def download_originals(self) -> bool:
-        return "original" in self.image_modes()
-
-    def image_mode(self) -> str:
-        return next(iter(self.image_modes()), "original")
 
     def image_modes(self) -> list[str]:
         return [
@@ -280,6 +291,7 @@ class Window(QMainWindow):
             self.retry_requested.emit(selected[0].message)
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        self._settings.setValue("address_filter", self._addresses.toPlainText())
         self._settings.setValue("image_modes", self.image_modes())
         self._settings.setValue("groups", self._groups.toPlainText())
         self.closing.emit()
