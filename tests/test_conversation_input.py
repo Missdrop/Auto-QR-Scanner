@@ -42,6 +42,7 @@ class ConversationInputTest(unittest.TestCase):
             )
             self.assertEqual(field._model.stringList(), ["ICS Group [one]"])
             self.assertTrue(field._completer.popup().isVisible())
+            self.assertGreaterEqual(field._completer.popup().width(), 320)
             QTest.keyClicks(field, "X")
             self.assertFalse(field._completer.popup().isVisible())
         field.close()
