@@ -100,6 +100,17 @@ class StudentTest(unittest.TestCase):
             self.student.open()
             browser.assert_called_once_with("about:blank")
 
+    def test_open_link_navigates_without_running_the_qr_adapter(self):
+        url = HOME_URL + "#/?state=example"
+        with (
+            patch.object(self.student._browser, "open") as navigate,
+            patch.object(self.student._browser, "process") as process,
+        ):
+            self.student.open_link(url)
+            navigate.assert_called_once_with(url)
+            process.assert_not_called()
+            self.assertIsNone(self.student._request_thread)
+
     def test_invalid_event_is_rejected(self) -> None:
         with self.assertRaises(HTTPError) as failure:
             self.send({"event": "session", "token": 42})

@@ -49,3 +49,11 @@ class HistoryTest(unittest.TestCase):
         self.assertEqual(len(self.history.recent(1)), 1)
         with self.assertRaises(ValueError):
             self.history.recent(0)
+
+    def test_actual_image_kind_survives_restart_and_old_records_stay_unknown(self):
+        result = self.result("original")
+        result.message.image_kind = "original"
+        self.history.save(result)
+        self.assertEqual(History(self.path).recent()[0].message.image_kind, "original")
+        self.history.save(self.result("legacy"))
+        self.assertEqual(History(self.path).recent()[0].message.image_kind, "unknown")

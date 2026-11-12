@@ -24,7 +24,9 @@ class DatabasePhoto:
             self.attr = "self" if sender == source.db.wxid else "friend"
 
     def download(self) -> Path:
-        return self._source.image(self.user, self.row)
+        path = self._source.image(self.user, self.row)
+        self.image_kind = self._source.image_kind
+        return path
 
 
 class DatabaseSource:
@@ -42,6 +44,16 @@ class DatabaseSource:
         self.thumbnail_only = False
 
     def resolve(self, name: str) -> str:
+        _, separator, identifier = name.rpartition(" [")
+        if separator and identifier.endswith("]"):
+            identifier = identifier[:-1]
+            matches = [
+                row
+                for row in self.db.search_contact(identifier)
+                if row["username"] == identifier
+            ]
+            if len(matches) == 1:
+                return identifier
         contacts = self.db.search_contact(name)
         matches = {
             row["username"]
@@ -73,11 +85,16 @@ class DatabaseSource:
         if not raw:
             raise ValueError("The image message is no longer available")
         files = self.media._image_files(user, self.media._img_md5(raw))
-        target = (
-            files.get("thumb")
-            if thumbnail_only
-            else (files.get("original") or files.get("mid") or files.get("thumb"))
-        )
+        tier = "thumb"
+        if not thumbnail_only:
+            original = files.get("original")
+            if original and self.media.original_ready(
+                original[1], (files.get("mid") or (None, 0))[1]
+            ):
+                tier = "original"
+            elif "mid" in files:
+                tier = "mid"
+        target = files.get(tier)
         if not target:
             raise FileNotFoundError("WeChat has not cached this image yet")
         probe = self.media._probe_ct(target[0])
@@ -87,9 +104,16 @@ class DatabaseSource:
         result = self.media.download_image(user, row["local_id"], **arguments)
         if not result or not Path(result).is_file():
             raise FileNotFoundError("No complete cached image is available")
+        self.image_kind = {
+            "thumb": "thumbnail",
+            "original": "original",
+            "mid": "compressed",
+        }[tier]
         return Path(result)
 
     def original(self, user: str, row: dict[str, Any], name: str) -> Path | None:
+        if name.endswith(f" [{user}]"):
+            name = name[: -(len(user) + 3)]
         raw = self.db.get_message_row(
             user, row["local_id"], local_type=3, shard=row.get("shard")
         )

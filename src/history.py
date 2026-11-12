@@ -51,6 +51,11 @@ class History:
                 connection.execute(
                     "ALTER TABLE scans ADD COLUMN warning TEXT NOT NULL DEFAULT ''"
                 )
+            if "image_kind" not in columns:
+                connection.execute(
+                    "ALTER TABLE scans ADD COLUMN image_kind TEXT "
+                    "NOT NULL DEFAULT 'unknown'"
+                )
 
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection]:
@@ -69,7 +74,7 @@ class History:
             # Serialize the lookup and insert to keep duplicate flags consistent.
             connection.execute("BEGIN IMMEDIATE")
             cursor = connection.execute(
-                "INSERT INTO scans VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO scans VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     message.message_id,
                     message.chat_name,
@@ -78,6 +83,7 @@ class History:
                     result.elapsed_ms,
                     result.error,
                     result.warning,
+                    message.image_kind,
                 ),
             )
             result.record_id = cursor.lastrowid
@@ -112,6 +118,7 @@ class History:
                     row[2],
                     Path(row[3]),
                     datetime.fromisoformat(row[4]),
+                    row[8],
                 )
                 codes = [Code(text, bool(duplicate)) for text, duplicate in code_rows]
                 results.append(

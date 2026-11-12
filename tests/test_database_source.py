@@ -62,6 +62,7 @@ class DatabaseSourceTest(unittest.TestCase):
                 xor_key=7,
             )
             self.source.media.download_image_original.assert_not_called()
+            self.assertEqual(self.source.image_kind, "compressed")
 
     def test_uncached_images_report_a_retriable_error(self) -> None:
         self.source.media._image_files.return_value = {}
@@ -86,3 +87,12 @@ class DatabaseSourceTest(unittest.TestCase):
             )
             self.source.media._probe_ct.assert_called_once_with(str(image))
             self.source.media.download_image_original.assert_not_called()
+            self.assertEqual(self.source.image_kind, "thumbnail")
+
+    def test_selected_candidate_resolves_by_unique_identifier(self):
+        self.source.db.search_contact.return_value = [
+            {"username": "unique@chatroom", "nick_name": "Group"}
+        ]
+        self.assertEqual(
+            self.source.resolve("Group [unique@chatroom]"), "unique@chatroom"
+        )
