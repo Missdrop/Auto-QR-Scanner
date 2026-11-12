@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from src.wechat import WeChat
 
@@ -66,3 +66,51 @@ class WeChatTest(unittest.TestCase):
         self.wechat._poll(client, ["Group"], self.received.append, self.notices.append)
         self.assertIn("Group:old", self.wechat._seen)
         self.assertEqual(self.received, [])
+
+    def test_free_backend_polls_even_when_listener_api_exists(self) -> None:
+        module = Mock()
+        module.__name__ = "wxauto4"
+        client = module.WeChat.return_value
+        events = []
+        access = Mock()
+        access.close.side_effect = lambda: events.append("restored")
+        com = Mock()
+        com.CoUninitialize.side_effect = lambda: events.append("uninitialized")
+
+        with (
+            patch("src.qt_access.QtAccess", return_value=access),
+            patch("src.wechat.importlib.import_module", return_value=com),
+            patch.object(self.wechat, "_load_backend", return_value=module),
+            patch.object(self.wechat, "_poll") as poll,
+            patch.object(self.wechat, "_listen") as listen,
+        ):
+            self.wechat._run(["Group"], self.received.append, self.notices.append)
+
+        module.WeChat.assert_called_once_with(
+            resize=False, ads=False, start_listener=False
+        )
+        poll.assert_called_once()
+        listen.assert_not_called()
+        client.StopListening.assert_called_once()
+        self.assertEqual(events, ["restored", "uninitialized"])
+
+    def test_failed_initialization_restores_accessibility(self) -> None:
+        module = Mock()
+        module.WeChat.side_effect = OSError("Window unavailable")
+        access = Mock()
+        with (
+            patch("src.qt_access.QtAccess", return_value=access),
+            patch("src.wechat.importlib.import_module"),
+            patch.object(self.wechat, "_load_backend", return_value=module),
+        ):
+            self.wechat._run(["Group"], self.received.append, self.notices.append)
+
+        access.close.assert_called_once()
+        self.assertIn("Window unavailable", self.notices[-1])
+
+    def test_close_waits_for_monitor_cleanup(self) -> None:
+        thread = Mock()
+        self.wechat._thread = thread
+        self.wechat.close()
+        self.assertTrue(self.wechat._stop.is_set())
+        thread.join.assert_called_once_with()
