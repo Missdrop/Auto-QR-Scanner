@@ -70,7 +70,6 @@ class Window(QMainWindow):
         descriptions = {
             "thumbnail": "使用缩略图：体积小、速度快、清晰度低；只读后台缓存。",
             "compressed": "使用压缩图：微信的普通清晰版本；只读后台缓存。",
-            "original": "使用原图：清晰度最高；未缓存时会短暂打开微信图片窗口下载。",
         }
         # Apply the revised defaults once, then preserve subsequent user choices.
         if not self._settings.value("image_defaults_updated", False, type=bool):
@@ -88,6 +87,9 @@ class Window(QMainWindow):
                 if legacy_mode is not None
                 else ["thumbnail", "compressed"]
             )
+        selected = [mode for mode in selected if mode in descriptions]
+        if not selected:
+            selected = ["thumbnail", "compressed"]
         for mode, description in descriptions.items():
             button = QCheckBox(description)
             self._image_modes[mode] = button
@@ -184,12 +186,6 @@ class Window(QMainWindow):
 
     def show_conversation_candidates(self, query: str, rows: list) -> None:
         self._groups.show_candidates(query, rows)
-
-    def download_originals(self) -> bool:
-        return "original" in self.image_modes()
-
-    def image_mode(self) -> str:
-        return next(iter(self.image_modes()), "original")
 
     def image_modes(self) -> list[str]:
         return [

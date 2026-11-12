@@ -57,7 +57,7 @@ class DatabaseSourceTest(unittest.TestCase):
                 "chat",
                 1,
                 shard="message_0.db",
-                tier="best",
+                tier="mid",
                 aes_key="verified-key",
                 xor_key=7,
             )
@@ -97,9 +97,9 @@ class DatabaseSourceTest(unittest.TestCase):
             self.source.resolve("Group [unique@chatroom]"), "unique@chatroom"
         )
 
-    def test_exact_original_selection_does_not_fall_back_to_thumbnail(self):
+    def test_removed_original_mode_is_rejected(self):
         self.source.media._image_files.return_value = {"thumb": ("thumb.dat", 100)}
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(ValueError):
             self.source.image("chat", {"local_id": 1}, "original")
         self.source.media.download_image.assert_not_called()
 

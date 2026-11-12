@@ -172,19 +172,28 @@ class AppTest(unittest.TestCase):
             )
             settings.setValue("image_mode", "original")
             settings.setValue("image_modes", ["original"])
+            settings.setValue("image_defaults_updated", True)
             window = Window(settings)
             self.assertTrue(window.automatic_open())
             self.assertEqual(window.image_modes(), ["thumbnail", "compressed"])
-            self.assertFalse(window.download_originals())
-            window._image_modes["original"].setChecked(True)
-            self.assertEqual(
-                window.image_modes(), ["thumbnail", "compressed", "original"]
-            )
-            self.assertTrue(window.download_originals())
-            self.assertTrue(window._image_modes["original"].isChecked())
+            self.assertNotIn("original", window._image_modes)
+            window._image_modes["thumbnail"].setChecked(False)
+            self.assertEqual(window.image_modes(), ["compressed"])
             window.close()
             restored = Window(settings)
-            self.assertEqual(
-                restored.image_modes(), ["thumbnail", "compressed", "original"]
-            )
+            self.assertEqual(restored.image_modes(), ["compressed"])
             restored.close()
+
+    def test_empty_saved_sources_restore_usable_defaults(self):
+        with tempfile.TemporaryDirectory() as directory:
+            settings = QSettings(
+                str(Path(directory) / "settings.ini"), QSettings.Format.IniFormat
+            )
+            settings.setValue("image_defaults_updated", True)
+            settings.setValue("image_modes", [])
+            window = Window(settings)
+            try:
+                self.assertEqual(window.image_modes(), ["thumbnail", "compressed"])
+                self.assertEqual(set(window._image_modes), {"thumbnail", "compressed"})
+            finally:
+                window.close()
