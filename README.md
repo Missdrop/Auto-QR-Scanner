@@ -88,3 +88,7 @@ uv run --extra wechat python -W error::ResourceWarning -m unittest discover -s t
 表格的“图片类型”按实际缓存来源显示缩略图、原图或压缩图；旧记录没有来源信息时显示未知，不按分辨率猜测。详情区右侧图片区域固定为 300 像素宽，长文件名不会挤压左侧字段。
 
 应用 Logo 位于 `assets/logo.png`，Windows 图标位于 `assets/logo.ico`，通过内置 image_gen 制作；设计提示保存在 `assets/logo-prompt.txt`。
+
+## 许可证
+
+本项目采用 [GNU General Public License v3.0](LICENSE)（`GPL-3.0-only`）。第三方组件保留各自的许可证，详见 [THIRD_PARTY.md](THIRD_PARTY.md) 和 `LICENSES` 目录。
