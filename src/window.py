@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .details import Details
 from .language import chinese
 from .outcome import Outcome
 from .result import ScanResult
@@ -64,9 +65,7 @@ class Window(QMainWindow):
         self._student_status = QLabel("")
         self._student_status.setWordWrap(True)
         self._table = self._create_table()
-        self._details = QPlainTextEdit()
-        self._details.setReadOnly(True)
-        self._details.setMaximumHeight(150)
+        self._details = Details()
         self.setCentralWidget(self._create_layout())
 
     def _create_table(self) -> QTableWidget:
@@ -118,6 +117,8 @@ class Window(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Vertical)
         splitter.addWidget(self._table)
         splitter.addWidget(self._details)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
         layout.addWidget(splitter)
 
         actions = QHBoxLayout()
@@ -206,16 +207,7 @@ class Window(QMainWindow):
         if selected is None:
             return
         result, text = selected
-        self._details.setPlainText(
-            f"图片：{result.message.image_path}\n"
-            f"识别：{chinese(result.status())}\n{chinese(result.error)}\n"
-            f"{chinese(result.warning)}\n{text}\n"
-            + (
-                self._outcomes[text].detail()
-                if text in self._outcomes
-                else "扫码结果：未提交"
-            ),
-        )
+        self._details.show_result(result, text, self._outcomes.get(text))
 
     def _copy_content(self) -> None:
         selected = self._selection()

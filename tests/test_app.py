@@ -72,7 +72,10 @@ class AppTest(unittest.TestCase):
                     self.assertEqual(window._records[0][1], "https://example.com")
                     open_browser.assert_not_called()
                 window._table.selectRow(0)
-                self.assertIn("https://example.com", window._details.toPlainText())
+                self.assertIn(
+                    "https://example.com", window._details.content.toPlainText()
+                )
+                self.assertFalse(window._details._preview.pixmap().isNull())
                 # Native backend cleanup can depend on the GUI handling a query.
                 released = Event()
                 monitor = Thread(target=lambda: released.wait(2), daemon=True)
@@ -111,6 +114,9 @@ class AppTest(unittest.TestCase):
                 controller.platform_completed.emit(
                     Outcome(url, "result", 1001, "Expired")
                 )
+                window._table.selectRow(0)
+                self.assertEqual(window._details._code.text(), "1001")
+                self.assertEqual(window._details._outcome.text(), "二维码已过期")
                 self.assertEqual(window.windowTitle(), "Auto QR Scanner")
                 self.assertEqual(
                     window._table.horizontalHeaderItem(5).text(), "扫码结果"
