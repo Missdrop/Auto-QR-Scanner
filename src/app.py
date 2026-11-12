@@ -1,9 +1,9 @@
 from datetime import datetime
 from pathlib import Path
-from queue import Full
 from uuid import uuid4
 
 from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import QApplication
 
 from .history import History
 from .message import ImageMessage
@@ -31,16 +31,17 @@ class App(QObject):
         scanner: Scanner,
         history: History,
         window: Window,
-        profile_path: Path,
+        student_directory: Path,
     ) -> None:
         super().__init__()
         self._closed = False
         self._wechat = wechat
         self._history = history
         self._window = window
-        self._student = Student(profile_path, self.student_notice.emit)
+        self._student = Student(student_directory, self.student_notice.emit)
         self._worker = Worker(scanner, history, self.completed.emit, self.notice.emit)
         self._connect_actions()
+        window.show_student_status(self._student.status())
 
         for result in reversed(history.recent()):
             window.add_result(result)
@@ -55,6 +56,7 @@ class App(QObject):
         self._window.files_requested.connect(self._scan_files)
         self._window.retry_requested.connect(self._worker.submit)
         self._window.login_requested.connect(self._open_login)
+        self._window.pairing_requested.connect(self._copy_pairing_code)
         self._window.student_open_requested.connect(self._open_student)
         self._window.closing.connect(self.close)
 
@@ -92,16 +94,27 @@ class App(QObject):
                 if not code.duplicate and Student.is_student_url(code.text):
                     self._open_student(code.text)
 
+    def _copy_pairing_code(self) -> None:
+        try:
+            QApplication.clipboard().setText(self._student.pairing_code())
+            self.student_notice.emit(
+                "Pairing code copied; paste it into the companion popup"
+            )
+        except OSError:
+            self.student_notice.emit(
+                "Cannot start the local bridge; close other app instances"
+            )
+
     def _open_login(self) -> None:
         try:
             self._student.open()
-        except (ValueError, Full) as exception:
+        except (ValueError, OSError) as exception:
             self.student_notice.emit(str(exception))
 
     def _open_student(self, url: str) -> None:
         try:
             self._student.open(url)
-        except (ValueError, Full) as exception:
+        except (ValueError, OSError) as exception:
             self.student_notice.emit(str(exception))
 
     def close(self) -> None:
