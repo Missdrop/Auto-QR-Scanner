@@ -28,6 +28,7 @@ dependencies = [
 
 [package.optional-dependencies]
 wechat = [
+    { name = "uiautomation", marker = "sys_platform == 'win32'" },
     { name = "wxauto4", marker = "sys_platform == 'win32'" },
 ]
 
@@ -35,6 +36,8 @@ wechat = [
 dev = [
     { name = "pyrefly" },
     { name = "ruff" },
+    { name = "types-psutil" },
+    { name = "types-pywin32" },
 ]
 
 [package.metadata]
@@ -42,6 +45,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.2,<3" },
     { name = "opencv-python-headless", specifier = ">=4.11,<5" },
     { name = "pyside6-essentials", specifier = ">=6.8,<6.9" },
+    { name = "uiautomation", marker = "sys_platform == 'win32' and extra == 'wechat'", specifier = ">=2.0" },
     { name = "wxauto4", marker = "sys_platform == 'win32' and extra == 'wechat'", specifier = ">=41.1.7" },
     { name = "zxing-cpp", specifier = ">=3.1.1" },
 ]
@@ -51,6 +55,8 @@ provides-extras = ["wechat"]
 dev = [
     { name = "pyrefly", specifier = ">=1.4.1" },
     { name = "ruff", specifier = ">=0.17.4" },
+    { name = "types-psutil", specifier = ">=7.2.2.20261111" },
+    { name = "types-pywin32", specifier = ">=312.0.0.20261104" },
 ]
 
 [[package]]
@@ -284,12 +290,42 @@ wheels = [
 ]
 
 [[package]]
+name = "types-psutil"
+version = "7.2.2.20261111"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/9c/30/9eb9f10b074aa0cb3456ad3469716169d0af6de58096719f31cb065aac68/types_psutil-7.2.2.20261111.tar.gz", hash = "sha256:d677119c44fb80cc9be41d8ac731f08bf89974bb1daa49b6688665a9d7224f42", size = 27439, upload-time = "2026-11-11T08:32:33.155Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c1/c2/6a9d0b3e4f55ad008891dda1f9316b077f28c22274c58869f8047f7d6b74/types_psutil-7.2.2.20261111-py3-none-any.whl", hash = "sha256:054f7b635fc908d3d27e49e8d274fbfed115a1a859f2edeae17519c0238286a1", size = 33394, upload-time = "2026-11-11T08:32:32.097Z" },
+]
+
+[[package]]
+name = "types-pywin32"
+version = "312.0.0.20261104"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/91/41/61c0dd54dba24b80a8f6326a38cd9c80fd250225a027f88fe6931929f9d5/types_pywin32-312.0.0.20261104.tar.gz", hash = "sha256:2944bdb1ce11397eb78c4a0ff031d18c9871730aed111b1cc1c872e6c854eccc", size = 358795, upload-time = "2026-11-04T08:14:13.826Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/25/e1/3ca417219f3be15e8c9111c4dd6f3ea9335e6722ab5a53f7c5ab46674e46/types_pywin32-312.0.0.20261104-py3-none-any.whl", hash = "sha256:1652e70149c9febdaaab1d0224354d6be51cab2e2963ba5e0f34c758a17e5a5a", size = 419941, upload-time = "2026-11-04T08:14:12.493Z" },
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.16.0"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f6/cc/6253133b5bb138fc3306cebfbda2c520f545d36b5be2c7255cc528bb45d6/typing_extensions-4.16.0.tar.gz", hash = "sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5", size = 113555, upload-time = "2026-07-02T08:40:05.92Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl", hash = "sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8", size = 45571, upload-time = "2026-07-02T08:40:04.659Z" },
+]
+
+[[package]]
+name = "uiautomation"
+version = "2.0.29"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "comtypes" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bc/23/8238b5cb73e54c3618ce4d443c1830a2749264a0d61a9b61637096b8dc7a/uiautomation-2.0.29.tar.gz", hash = "sha256:3c169112043ce21065aead1d79c3baebdafc9cf03bd24ded02b2db11d423d88d", size = 203970, upload-time = "2025-08-05T05:14:41.194Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b0/27/b9c4b33b4129805fa2c437fa13da06c71e74213ae46da098d194d89834fe/uiautomation-2.0.29-py3-none-any.whl", hash = "sha256:5dd51c9e77e70470142a13d903be67f256c445e7cf20b47ada0ece2bdaff9f32", size = 198985, upload-time = "2025-08-05T05:14:39.552Z" },
 ]
 
 [[package]]
