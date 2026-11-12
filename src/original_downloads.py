@@ -5,6 +5,7 @@ import os
 from collections import deque
 from collections.abc import Callable
 from pathlib import Path
+from queue import Empty
 from time import monotonic
 from typing import Any
 
@@ -41,7 +42,12 @@ def failure_notice(code: int | None) -> str:
 
 
 def download_original(
-    directory: Path, images: Path, name: str, user: str, row: dict
+    directory: Path,
+    images: Path,
+    name: str,
+    user: str,
+    row: dict,
+    results: Any = None,
 ) -> None:
     """
     Fetch exactly one original through the authorized WeChat image viewer.
@@ -65,7 +71,9 @@ def download_original(
             source = DatabaseSource(directory, images)
             # Cached originals need neither focus nor accessibility compatibility.
             try:
-                source.image(user, row, "original")
+                cached = source.image(user, row, "original")
+                if results is not None:
+                    results.put(str(cached))
                 return
             except FileNotFoundError:
                 pass
@@ -77,8 +85,11 @@ def download_original(
             logger.propagate = False
             logger.setLevel(logging.DEBUG)
             logging.disable(logging.NOTSET)
-            if source.original(user, row, name) is None:
+            path = source.original(user, row, name)
+            if path is None:
                 raise SystemExit(diagnostics.code)
+            if results is not None:
+                results.put(str(path))
         except Exception:
             raise SystemExit(6) from None
         finally:
@@ -104,6 +115,8 @@ class OriginalDownloads:
         self._pending: deque[tuple[str, str, str, dict]] = deque()
         self._process: Any = None
         self._active = ""
+        self._results: Any = None
+        self._completed: deque[tuple[str, Path]] = deque()
         self._deadline = 0.0
         self._notify = notify or (lambda message: None)
         self.last_success: bool | None = None
@@ -126,6 +139,15 @@ class OriginalDownloads:
             self._process.close()
             self._process = None
             self._active = ""
+            if self._results is not None:
+                self._results.close()
+                self._results.cancel_join_thread()
+                self._results = None
+
+    def take_completed(self) -> list[tuple[str, Path]]:
+        completed = list(self._completed)
+        self._completed.clear()
+        return completed
 
     def poll(self) -> None:
         if self._process is not None:
@@ -136,13 +158,25 @@ class OriginalDownloads:
             if not self.last_success:
                 code = 7 if timed_out else self._process.exitcode
                 self._notify(failure_notice(code))
+            elif self._results is not None:
+                try:
+                    path = Path(self._results.get_nowait()).resolve()
+                    if path.is_relative_to(self._images.resolve()) and path.is_file():
+                        self._completed.append((self._active, path))
+                    else:
+                        self.last_success = False
+                        self._notify(failure_notice(5))
+                except Empty:
+                    self.last_success = False
+                    self._notify(failure_notice(5))
             self._finish()
         if self._pending:
             identifier, name, user, row = self._pending.popleft()
             context = multiprocessing.get_context("spawn")
+            self._results = context.Queue(maxsize=1)
             self._process = context.Process(
                 target=download_original,
-                args=(self._directory, self._images, name, user, row),
+                args=(self._directory, self._images, name, user, row, self._results),
             )
             self._active = identifier
             self._deadline = monotonic() + 30

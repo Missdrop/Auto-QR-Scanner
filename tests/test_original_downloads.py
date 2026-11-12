@@ -1,4 +1,5 @@
 import logging
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock
@@ -12,6 +13,25 @@ from src.original_downloads import (
 
 
 class OriginalDownloadsTest(unittest.TestCase):
+    def test_completed_download_returns_its_actual_saved_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            image = root / "saved.jpg"
+            image.write_bytes(b"photo")
+            downloads = OriginalDownloads(root, root, self.fail)
+            process = Mock()
+            process.is_alive.return_value = False
+            process.exitcode = 0
+            results = Mock()
+            results.get_nowait.return_value = str(image)
+            downloads._process = process
+            downloads._results = results
+            downloads._active = "one"
+            downloads.poll()
+            self.assertEqual(downloads.take_completed(), [("one", image.resolve())])
+            self.assertEqual(downloads.take_completed(), [])
+            results.close.assert_called_once()
+
     def test_failure_category_does_not_keep_private_log_values(self) -> None:
         diagnostics = DownloadDiagnostics()
         record = logging.LogRecord(
