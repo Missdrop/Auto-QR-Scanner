@@ -9,7 +9,7 @@ function readSession() {
         if (mobile?.token && mobile?.userId) return mobile;
         const desktop = JSON.parse(localStorage.getItem("userInfo") || "null");
         const rawToken = localStorage.getItem("Token");
-        // AMS desktop identifies the student with sourceId; mobile uses userId.
+        // Keep an opaque account reference; QR requests use only the session token.
         const userId = desktop?.userId ?? desktop?.sourceId;
         if (!userId || !rawToken) return null;
         let token = rawToken;

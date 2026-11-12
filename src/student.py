@@ -1,13 +1,14 @@
 import hmac
 import json
 import secrets
-import webbrowser
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Lock, Thread
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import urlsplit
 
+from .ams import Ams
+from .browser import Browser
 from .secret_store import SecretStore
 
 HOME_URL = "https://ams.xjtlu.edu.cn/studenth5/"
@@ -17,13 +18,17 @@ class Student:
     """
     Receive student sessions from the companion extension over authenticated loopback.
 
-    Login stays in the normal browser. Only AMS session values are stored, protected
-    by Windows DPAPI; passwords and authentication forms are never read.
+    Login stays in the normal browser. QR results come from the existing AMS HTTPS
+    endpoint. Session values use Windows DPAPI; passwords are never read.
     """
 
     def __init__(self, directory: Path, notify: Callable[[str], None]) -> None:
         directory.mkdir(parents=True, exist_ok=True)
         self._notify = notify
+        self._browser = Browser()
+        self._ams = Ams()
+        self._processing = Lock()
+        self._request_thread: Thread | None = None
         self._store = SecretStore(directory / "session.bin")
         self._session = self._store.load()
         self._lock = Lock()
@@ -68,11 +73,53 @@ class Student:
             return
 
         if url != HOME_URL:
-            url = self._authenticated_url(url, student)
+            state = self._ams.state(url)
+            if not self._processing.acquire(blocking=False):
+                self._notify(
+                    "A student request is running; retry this record afterwards"
+                )
+                return
             self._notify("Student session available; waiting for the platform result")
-        else:
-            self._notify("Complete student login in your normal paired browser")
-        webbrowser.open(url, new=2)
+            self._request_thread = Thread(
+                target=self._process,
+                args=(state, student["token"]),
+                name="student-request",
+                daemon=True,
+            )
+            self._request_thread.start()
+            return
+        self._notify("Complete student login in your normal paired browser")
+        if not self._browser.open(url):
+            self._notify("Cannot open the student page; check the installed browser")
+
+    def _process(self, state: str, token: str) -> None:
+        try:
+            code, message = self._ams.process(state, token)
+            if code == 401:
+                with self._lock:
+                    current = self._session.get("token") == token
+                    if current:
+                        self._store.save({})
+                        self._session = {}
+                if current:
+                    self._notify(
+                        "Login required: student session expired or was cleared"
+                    )
+                else:
+                    self._notify(
+                        "The earlier session expired; retry with the new login"
+                    )
+            elif code == 0:
+                self._notify("Platform confirmed successful processing: " + message)
+            else:
+                self._notify("Platform rejected the QR code: " + message)
+        except Exception as exception:
+            self._notify(
+                f"Cannot obtain a platform result: {type(exception).__name__}. "
+                "Inspect the student login and retry manually."
+            )
+        finally:
+            self._processing.release()
 
     @staticmethod
     def is_student_url(url: str) -> bool:
@@ -85,15 +132,6 @@ class Student:
             and parts.netloc == "ams.xjtlu.edu.cn"
             and parts.path == "/studenth5/"
         )
-
-    @staticmethod
-    def _authenticated_url(url: str, student: dict[str, str]) -> str:
-        parts = urlsplit(url)
-        route, _, query = parts.fragment.partition("?")
-        parameters = dict(parse_qsl(query))
-        parameters["userId"] = student["userId"]
-        parameters["token"] = student["token"]
-        return urlunsplit(parts._replace(fragment=route + "?" + urlencode(parameters)))
 
     def _receive(self, payload: dict[str, object]) -> None:
         event = payload.get("event")
@@ -183,6 +221,8 @@ class Student:
         return "Student login required"
 
     def close(self) -> None:
+        if self._request_thread is not None:
+            self._request_thread.join(timeout=12)
         if self._server is not None:
             self._server.shutdown()
             self._server.server_close()
