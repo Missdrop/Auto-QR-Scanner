@@ -2,12 +2,13 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from threading import Event, Thread
 from unittest.mock import patch
 
 import cv2
 import numpy as np
 import zxingcpp
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QSettings, QTimer
 from PySide6.QtWidgets import QApplication
 
 from src.app import App
@@ -68,6 +69,15 @@ class AppTest(unittest.TestCase):
                     open_browser.assert_not_called()
                 window._table.selectRow(0)
                 self.assertIn("https://example.com", window._details.toPlainText())
+                # Native backend cleanup can depend on the GUI handling a query.
+                released = Event()
+                monitor = Thread(target=lambda: released.wait(2), daemon=True)
+                controller._wechat._thread = monitor
+                monitor.start()
+                QTimer.singleShot(0, released.set)
+                controller.close()
+                self.assertTrue(released.is_set())
+                self.assertFalse(monitor.is_alive())
             finally:
                 controller.close()
                 window.close()

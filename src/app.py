@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+from time import sleep
 from uuid import uuid4
 
 from PySide6.QtCore import QObject, Signal
@@ -128,6 +129,12 @@ class App(QObject):
         if self._closed:
             return
         self._closed = True
+        self._wechat.stop()
+        while self._wechat.is_running():
+            # The backend destructor queries native windows on the worker thread.
+            # Keep responding to those queries until it has finished.
+            QApplication.processEvents()
+            sleep(0.01)
         self._wechat.close()
         self._worker.close()
         self._student.close()
