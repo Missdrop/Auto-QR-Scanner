@@ -38,4 +38,4 @@ select = ["E", "F", "I", "UP", "B"]
 project-includes = ["src"]
 
 [tool.uv]
-override-dependencies = ["python-snappy>=0.7.3,<1"]
+override-dependencies = ["python-snappy>=0.7.3,<1", "zstd==1.5.7.2"]

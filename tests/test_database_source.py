@@ -97,6 +97,12 @@ class DatabaseSourceTest(unittest.TestCase):
             self.source.resolve("Group [unique@chatroom]"), "unique@chatroom"
         )
 
+    def test_exact_original_selection_does_not_fall_back_to_thumbnail(self):
+        self.source.media._image_files.return_value = {"thumb": ("thumb.dat", 100)}
+        with self.assertRaises(FileNotFoundError):
+            self.source.image("chat", {"local_id": 1}, "original")
+        self.source.media.download_image.assert_not_called()
+
     def test_compressed_mode_uses_mid_cache_even_when_original_exists(self):
         with tempfile.TemporaryDirectory() as directory:
             image = Path(directory) / "mid.jpg"

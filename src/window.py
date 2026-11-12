@@ -1,18 +1,17 @@
 from collections.abc import Callable
+from pathlib import Path
 
 from PySide6.QtCore import QSettings, Qt, Signal
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtGui import QCloseEvent, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
-    QButtonGroup,
     QCheckBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QMainWindow,
     QPushButton,
-    QRadioButton,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
@@ -53,6 +52,9 @@ class Window(QMainWindow):
             settings if settings is not None else QSettings("AutoQRScanner", "Desktop")
         )
         self.setWindowTitle("Auto QR Scanner")
+        self.setWindowIcon(
+            QIcon(str(Path(__file__).resolve().parent.parent / "assets/logo.ico"))
+        )
         self.resize(1180, 760)
 
         self._groups = ConversationInput()
@@ -64,29 +66,28 @@ class Window(QMainWindow):
         self._groups.setMaximumHeight(100)
         self._automatic = QCheckBox("识别后自动扫码")
         self._automatic.setChecked(True)
-        self._image_modes: dict[str, QRadioButton] = {}
-        self._image_mode_group = QButtonGroup(self)
+        self._image_modes: dict[str, QCheckBox] = {}
         descriptions = {
-            "thumbnail": (
-                "使用缩略图：体积小、识别快、清晰度低；只读后台缓存，不打开微信窗口。"
-            ),
-            "compressed": (
-                "使用压缩图：微信的普通清晰版本；只读后台缓存，"
-                "没有时先扫缩略图，不打开微信窗口。"
-            ),
-            "original": (
-                "使用原图：清晰度最高；先扫现有图片，同时下载原图，"
-                "会短暂打开微信图片窗口；识别成功后不重复扫。"
-            ),
+            "thumbnail": "使用缩略图：体积小、速度快、清晰度低；只读后台缓存。",
+            "compressed": "使用压缩图：微信的普通清晰版本；只读后台缓存。",
+            "original": "使用原图：清晰度最高；未缓存时会短暂打开微信图片窗口下载。",
         }
-        selected = self._settings.value("image_mode", "original")
-        if selected not in descriptions:
-            selected = "original"
+        saved = self._settings.value("image_modes", None)
+        if isinstance(saved, list):
+            selected = [str(mode) for mode in saved]
+        elif isinstance(saved, str):
+            selected = [saved]
+        else:
+            legacy_mode = self._settings.value("image_mode", None)
+            selected = (
+                [str(legacy_mode)]
+                if legacy_mode is not None
+                else ["thumbnail", "compressed"]
+            )
         for mode, description in descriptions.items():
-            button = QRadioButton(description)
-            self._image_mode_group.addButton(button)
+            button = QCheckBox(description)
             self._image_modes[mode] = button
-            button.setChecked(mode == selected)
+            button.setChecked(mode in selected)
         self._status = QLabel("就绪")
         self._student_status = QLabel("")
         self._student_status.setWordWrap(True)
@@ -181,13 +182,15 @@ class Window(QMainWindow):
         self._groups.show_candidates(query, rows)
 
     def download_originals(self) -> bool:
-        return self.image_mode() == "original"
+        return "original" in self.image_modes()
 
     def image_mode(self) -> str:
-        return next(
-            (mode for mode, button in self._image_modes.items() if button.isChecked()),
-            "original",
-        )
+        return next(iter(self.image_modes()), "original")
+
+    def image_modes(self) -> list[str]:
+        return [
+            mode for mode, button in self._image_modes.items() if button.isChecked()
+        ]
 
     def set_monitoring(self, running: bool) -> None:
         self._start.setEnabled(not running)
@@ -273,7 +276,7 @@ class Window(QMainWindow):
             self.retry_requested.emit(selected[0].message)
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        self._settings.setValue("image_mode", self.image_mode())
+        self._settings.setValue("image_modes", self.image_modes())
         self._settings.setValue("groups", self._groups.toPlainText())
         self.closing.emit()
         event.accept()

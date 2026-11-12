@@ -3,15 +3,46 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 from threading import Event
+from unittest.mock import Mock
 
 from src.history import History
 from src.image_processor import ImageProcessor
 from src.message import ImageMessage
+from src.result import Code, ScanResult
 from src.scanner import Scanner
 from src.worker import Worker
 
 
 class WorkerTest(unittest.TestCase):
+    def test_success_does_not_skip_other_versions_of_the_same_message(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            messages = [
+                ImageMessage("same", "Chat", root / "image.jpg", datetime.now(), kind)
+                for kind in ("thumbnail", "original")
+            ]
+            scanner = Mock()
+            scanner.scan.side_effect = [
+                ScanResult(message, [Code("same-qr")]) for message in messages
+            ]
+            completed, results = Event(), []
+
+            def receive(result, automatic):
+                results.append(result)
+                if len(results) == 2:
+                    completed.set()
+
+            worker = Worker(
+                scanner, History(root / "history.sqlite3"), receive, self.fail
+            )
+            try:
+                for message in messages:
+                    worker.submit(message, True)
+                self.assertTrue(completed.wait(3))
+                self.assertEqual(scanner.scan.call_count, 2)
+            finally:
+                worker.close()
+
     def test_failed_image_is_recorded_and_worker_closes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
