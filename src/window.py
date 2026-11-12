@@ -72,6 +72,10 @@ class Window(QMainWindow):
             "compressed": "使用压缩图：微信的普通清晰版本；只读后台缓存。",
             "original": "使用原图：清晰度最高；未缓存时会短暂打开微信图片窗口下载。",
         }
+        # Apply the revised defaults once, then preserve subsequent user choices.
+        if not self._settings.value("image_defaults_updated", False, type=bool):
+            self._settings.setValue("image_modes", ["thumbnail", "compressed"])
+            self._settings.setValue("image_defaults_updated", True)
         saved = self._settings.value("image_modes", None)
         if isinstance(saved, list):
             selected = [str(mode) for mode in saved]

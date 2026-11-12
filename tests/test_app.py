@@ -138,6 +138,8 @@ class AppTest(unittest.TestCase):
             settings = QSettings(
                 str(Path(directory) / "settings.ini"), QSettings.Format.IniFormat
             )
+            settings.setValue("image_mode", "original")
+            settings.setValue("image_modes", ["original"])
             window = Window(settings)
             self.assertTrue(window.automatic_open())
             self.assertEqual(window.image_modes(), ["thumbnail", "compressed"])
