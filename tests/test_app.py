@@ -197,3 +197,51 @@ class AppTest(unittest.TestCase):
                 self.assertEqual(set(window._image_modes), {"thumbnail", "compressed"})
             finally:
                 window.close()
+
+    def test_address_filter_blocks_automatic_requests_and_persists(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            settings = QSettings(str(root / "settings.ini"), QSettings.Format.IniFormat)
+            window = Window(settings)
+            history = History(root / "history.sqlite3")
+            controller = App(
+                WeChat(root / "images"),
+                Scanner(ImageProcessor()),
+                history,
+                window,
+                root / "profile",
+            )
+            allowed = "https://example.com/qr/one"
+            blocked = "https://other.example/qr"
+            result = ScanResult(
+                ImageMessage("one", "Chat", root / "image.jpg", datetime.now()),
+                [Code(allowed), Code(blocked)],
+            )
+            try:
+                window._addresses.setPlainText("https://example.com/qr/")
+                with patch.object(controller._student, "open") as open_browser:
+                    controller._show_result(result, True)
+                    open_browser.assert_called_once_with(allowed)
+                self.assertEqual(history.outcome(blocked).status, "filtered")
+                self.assertEqual(history.outcome(blocked).label(), "已被地址过滤")
+                window._addresses.clear()
+                with patch.object(controller._student, "open") as open_browser:
+                    controller._show_result(result, True)
+                    self.assertEqual(open_browser.call_count, 2)
+                history.save_outcome(Outcome(blocked, "result", 0))
+                window._addresses.setPlainText("example.com")
+                with patch.object(controller._student, "open"):
+                    controller._show_result(result, True)
+                self.assertEqual(history.outcome(blocked).code, 0)
+                window._addresses.setPlainText("https://")
+                with patch.object(controller._wechat, "start") as start:
+                    controller._start_monitoring(["Chat"])
+                    start.assert_not_called()
+                window._addresses.setPlainText("example.com\nsecond.example")
+            finally:
+                controller.close()
+                window.close()
+            restored = Window(settings)
+            self.assertTrue(restored.address_filter().allows("https://second.example/"))
+            self.assertFalse(restored.address_filter().allows("https://other.example/"))
+            restored.close()
