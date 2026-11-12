@@ -23,12 +23,14 @@ class ScanResult:
         elapsed_ms: float = 0,
         error: str = "",
         record_id: int | None = None,
+        warning: str = "",
     ) -> None:
         self.message = message
         self.codes = list(codes)
         self.elapsed_ms = elapsed_ms
         self.error = error
         self.record_id = record_id
+        self.warning = warning
 
     def status(self) -> str:
         if self.error:

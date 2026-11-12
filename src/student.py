@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 
 from .ams import Ams
 from .browser import Browser
+from .outcome import Outcome
 from .secret_store import SecretStore
 
 HOME_URL = "https://ams.xjtlu.edu.cn/studenth5/"
@@ -23,9 +24,15 @@ class Student:
     Session metadata uses Windows DPAPI; passwords are never read.
     """
 
-    def __init__(self, directory: Path, notify: Callable[[str], None]) -> None:
+    def __init__(
+        self,
+        directory: Path,
+        notify: Callable[[str], None],
+        outcome: Callable[[Outcome], None] | None = None,
+    ) -> None:
         directory.mkdir(parents=True, exist_ok=True)
         self._notify = notify
+        self._outcome = outcome or (lambda result: None)
         self._browser = Browser(directory)
         self._ams = Ams()
         self._processing = Lock()
@@ -75,12 +82,13 @@ class Student:
         with self._lock:
             student = dict(self._session)
         if url != HOME_URL and not student:
+            self._outcome(Outcome(url, "login"))
             self._notify("Login required: open Student login and sign in")
             return
 
         if url != HOME_URL:
-            state = self._ams.state(url)
-            self._enqueue(state, student["token"])
+            self._ams.state(url)
+            self._enqueue(url, student["token"])
             return
         self._notify(
             "Sign in using Chromium, then close its window to synchronize the session"
@@ -88,12 +96,14 @@ class Student:
         if not self._browser.open(url):
             self._notify("Cannot open the student page; check the installed browser")
 
-    def _enqueue(self, state: str, token: str) -> None:
+    def _enqueue(self, url: str, token: str) -> None:
         with self._queue_lock:
             if len(self._pending) >= 64:
+                self._outcome(Outcome(url, "error", message="Queue is full"))
                 self._notify("Student queue is full; retry this record manually")
                 return
-            self._pending.append((state, token))
+            self._pending.append((url, token))
+            self._outcome(Outcome(url, "queued"))
             if self._running:
                 self._notify("QR code queued for Chromium processing")
                 return
@@ -114,17 +124,20 @@ class Student:
                     self._running = False
                     self._processing.release()
                     return
-                state, token = self._pending.popleft()
+                url, token = self._pending.popleft()
             with self._lock:
                 available = bool(self._session)
             if available:
-                self._process(state, token)
+                self._outcome(Outcome(url, "processing"))
+                self._process(url, token)
             else:
+                self._outcome(Outcome(url, "login"))
                 self._notify("Login required; retry pending records after signing in")
 
-    def _process(self, state: str, token: str) -> None:
+    def _process(self, url: str, token: str) -> None:
         try:
-            code, message = self._browser.process(state)
+            code, message = self._browser.process(self._ams.state(url))
+            self._outcome(Outcome(url, "result", code, message))
             if code == 401:
                 with self._lock:
                     current = self._session.get("token") == token
@@ -144,8 +157,10 @@ class Student:
             else:
                 self._notify("Platform rejected the QR code: " + message)
         except RuntimeError as exception:
+            self._outcome(Outcome(url, "error", message=str(exception)))
             self._notify(str(exception))
         except Exception as exception:
+            self._outcome(Outcome(url, "error", message=type(exception).__name__))
             self._notify(
                 f"Cannot obtain a platform result: {type(exception).__name__}. "
                 "Inspect the student login and retry manually."
@@ -237,6 +252,8 @@ class Student:
     def close(self) -> None:
         self._closed = True
         with self._queue_lock:
+            for url, _ in self._pending:
+                self._outcome(Outcome(url, "cancelled"))
             self._pending.clear()
         if self._request_thread is not None:
             self._request_thread.join(timeout=35)

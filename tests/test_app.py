@@ -1,6 +1,7 @@
 import tempfile
 import time
 import unittest
+from datetime import datetime
 from pathlib import Path
 from threading import Event, Thread
 from unittest.mock import patch
@@ -14,6 +15,9 @@ from PySide6.QtWidgets import QApplication
 from src.app import App
 from src.history import History
 from src.image_processor import ImageProcessor
+from src.message import ImageMessage
+from src.outcome import Outcome
+from src.result import Code, ScanResult
 from src.scanner import Scanner
 from src.student import Student
 from src.wechat import WeChat
@@ -78,6 +82,47 @@ class AppTest(unittest.TestCase):
                 controller.close()
                 self.assertTrue(released.is_set())
                 self.assertFalse(monitor.is_alive())
+            finally:
+                controller.close()
+                window.close()
+
+    def test_result_column_is_chinese_and_survives_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            window = Window(
+                QSettings(str(root / "settings.ini"), QSettings.Format.IniFormat)
+            )
+            history = History(root / "history.sqlite3")
+            controller = App(
+                WeChat(root / "images"),
+                Scanner(ImageProcessor()),
+                history,
+                window,
+                root / "student",
+            )
+            try:
+                url = "https://ams.xjtlu.edu.cn/studenth5/#/?state=example"
+                result = ScanResult(
+                    ImageMessage("one", "Chat", root / "image.png", datetime.now()),
+                    [Code(url)],
+                )
+                history.save(result)
+                controller._show_result(result, False)
+                controller.platform_completed.emit(
+                    Outcome(url, "result", 1001, "Expired")
+                )
+                self.assertEqual(window.windowTitle(), "Auto QR Scanner")
+                self.assertEqual(
+                    window._table.horizontalHeaderItem(5).text(), "扫码结果"
+                )
+                self.assertEqual(window._table.item(0, 5).text(), "二维码已过期")
+                controller._show_student_notice(
+                    "Platform rejected the QR code: Expired"
+                )
+                self.assertEqual(window._student_status.text(), "二维码已过期")
+                self.assertEqual(
+                    History(root / "history.sqlite3").outcome(url).code, 1001
+                )
             finally:
                 controller.close()
                 window.close()

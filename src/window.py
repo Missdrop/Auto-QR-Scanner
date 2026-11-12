@@ -21,6 +21,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .language import chinese
+from .outcome import Outcome
 from .result import ScanResult
 
 
@@ -43,6 +45,7 @@ class Window(QMainWindow):
     def __init__(self, settings: QSettings | None = None) -> None:
         super().__init__()
         self._records: list[tuple[ScanResult, str]] = []
+        self._outcomes: dict[str, Outcome] = {}
         self._settings = (
             settings if settings is not None else QSettings("AutoQRScanner", "Desktop")
         )
@@ -50,13 +53,15 @@ class Window(QMainWindow):
         self.resize(1180, 760)
 
         self._groups = QPlainTextEdit()
-        self._groups.setPlaceholderText("Exact WeChat group names, one per line")
+        self._groups.setPlaceholderText("填写精确群名或联系人名称，每行一个")
         self._groups.setPlainText(str(self._settings.value("groups", "")))
         self._groups.setMaximumHeight(100)
-        self._automatic = QCheckBox("Process new AMS codes in student session")
+        self._automatic = QCheckBox("识别后自动扫码")
         self._automatic.setChecked(True)
-        self._status = QLabel("Ready")
-        self._student_status = QLabel("Student login required")
+        self._originals = QCheckBox("同时下载原图（会短暂打开微信图片窗口）")
+        self._originals.setChecked(True)
+        self._status = QLabel("就绪")
+        self._student_status = QLabel("请先登录账号")
         self._student_status.setWordWrap(True)
         self._table = self._create_table()
         self._details = QPlainTextEdit()
@@ -65,14 +70,25 @@ class Window(QMainWindow):
         self.setCentralWidget(self._create_layout())
 
     def _create_table(self) -> QTableWidget:
-        table = QTableWidget(0, 5)
+        table = QTableWidget(0, 6)
         table.setHorizontalHeaderLabels(
-            ["Received", "Group", "Status", "QR content", "ms"]
+            [
+                "收到时间",
+                "会话",
+                "识别状态",
+                "二维码内容",
+                "识别耗时（毫秒）",
+                "扫码结果",
+            ]
         )
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        for column in (2, 4, 5):
+            table.horizontalHeader().setSectionResizeMode(
+                column, QHeaderView.ResizeMode.ResizeToContents
+            )
         table.itemSelectionChanged.connect(self._show_selection)
         table.setWordWrap(False)
         return table
@@ -80,23 +96,24 @@ class Window(QMainWindow):
     def _create_layout(self) -> QWidget:
         widget = QWidget()
         layout = QVBoxLayout(widget)
-        layout.addWidget(QLabel("WeChat conversations"))
+        layout.addWidget(QLabel("微信会话"))
         layout.addWidget(self._groups)
 
         controls = QHBoxLayout()
-        self._start = self._button("Start monitoring", self._request_start, controls)
+        self._start = self._button("开始监听", self._request_start, controls)
         self._latest = self._button(
-            "Scan latest chat image",
+            "扫描最近图片",
             lambda: self.latest_requested.emit(self._groups.toPlainText().splitlines()),
             controls,
         )
-        self._stop = self._button("Stop", self.stop_requested.emit, controls)
+        self._stop = self._button("停止", self.stop_requested.emit, controls)
         self._stop.setEnabled(False)
-        self._button("Scan images", self._select_images, controls)
-        self._button("Scan folder", self._select_folder, controls)
-        self._button("Student login", self.login_requested.emit, controls)
+        self._button("仅识别本地图片", self._select_images, controls)
+        self._button("仅识别图片文件夹", self._select_folder, controls)
+        self._button("账号登录", self.login_requested.emit, controls)
         layout.addLayout(controls)
         layout.addWidget(self._automatic)
+        layout.addWidget(self._originals)
         layout.addWidget(self._student_status)
 
         splitter = QSplitter(Qt.Orientation.Vertical)
@@ -105,10 +122,10 @@ class Window(QMainWindow):
         layout.addWidget(splitter)
 
         actions = QHBoxLayout()
-        self._button("Copy content", self._copy_content, actions)
-        self._button("Open link", self._open_link, actions)
-        self._button("Process with student account", self._open_student, actions)
-        self._button("Retry image", self._retry, actions)
+        self._button("复制内容", self._copy_content, actions)
+        self._button("打开链接", self._open_link, actions)
+        self._button("使用当前账号扫码", self._open_student, actions)
+        self._button("重新识别并处理", self._retry, actions)
         layout.addLayout(actions)
         layout.addWidget(self._status)
         return widget
@@ -132,15 +149,15 @@ class Window(QMainWindow):
     def _select_images(self) -> None:
         files, _ = QFileDialog.getOpenFileNames(
             self,
-            "Scan images",
+            "仅识别本地图片",
             "",
-            "Images (*.png *.jpg *.jpeg *.bmp *.webp)",
+            "图片 (*.png *.jpg *.jpeg *.bmp *.webp)",
         )
         if files:
             self.files_requested.emit([Path(name) for name in files])
 
     def _select_folder(self) -> None:
-        directory = QFileDialog.getExistingDirectory(self, "Scan image folder")
+        directory = QFileDialog.getExistingDirectory(self, "选择图片文件夹")
         if directory:
             paths = sorted(
                 path
@@ -152,6 +169,9 @@ class Window(QMainWindow):
     def automatic_open(self) -> bool:
         return self._automatic.isChecked()
 
+    def download_originals(self) -> bool:
+        return self._originals.isChecked()
+
     def set_monitoring(self, running: bool) -> None:
         self._start.setEnabled(not running)
         self._latest.setEnabled(not running)
@@ -159,10 +179,10 @@ class Window(QMainWindow):
         self._groups.setEnabled(not running)
 
     def show_status(self, message: str) -> None:
-        self._status.setText(message)
+        self._status.setText(chinese(message))
 
     def show_student_status(self, message: str) -> None:
-        self._student_status.setText(message)
+        self._student_status.setText(chinese(message))
 
     def add_result(self, result: ScanResult) -> None:
         values = [code.text for code in result.codes] or [""]
@@ -172,9 +192,14 @@ class Window(QMainWindow):
             columns = [
                 result.message.received_at.strftime("%m-%d %H:%M:%S"),
                 result.message.chat_name,
-                result.status(),
+                (
+                    "未识别（低分辨率）"
+                    if not result.codes and result.warning
+                    else chinese(result.status())
+                ),
                 text,
                 f"{result.elapsed_ms:.0f}",
+                self._outcomes[text].label() if text in self._outcomes else "未提交",
             ]
             for column, value in enumerate(columns):
                 self._table.setItem(0, column, QTableWidgetItem(value))
@@ -182,6 +207,14 @@ class Window(QMainWindow):
         while len(self._records) > 2000:
             self._records.pop()
             self._table.removeRow(self._table.rowCount() - 1)
+
+    def show_outcome(self, outcome: Outcome) -> None:
+        self._outcomes[outcome.url] = outcome
+        self._student_status.setText(outcome.label())
+        for row, (_, text) in enumerate(self._records):
+            if text == outcome.url:
+                self._table.setItem(row, 5, QTableWidgetItem(outcome.label()))
+        self._show_selection()
 
     def _selection(self) -> tuple[ScanResult, str] | None:
         row = self._table.currentRow()
@@ -195,8 +228,14 @@ class Window(QMainWindow):
             return
         result, text = selected
         self._details.setPlainText(
-            f"Image: {result.message.image_path}\n"
-            f"Status: {result.status()}\n{result.error}\n{text}",
+            f"图片：{result.message.image_path}\n"
+            f"识别：{chinese(result.status())}\n{chinese(result.error)}\n"
+            f"{chinese(result.warning)}\n{text}\n"
+            + (
+                self._outcomes[text].detail()
+                if text in self._outcomes
+                else "扫码结果：未提交"
+            ),
         )
 
     def _copy_content(self) -> None:

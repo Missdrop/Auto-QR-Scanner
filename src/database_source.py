@@ -79,3 +79,29 @@ class DatabaseSource:
         if not result or not Path(result).is_file():
             raise FileNotFoundError("No complete cached image is available")
         return Path(result)
+
+    def original(self, user: str, row: dict[str, Any], name: str) -> Path | None:
+        raw = self.db.get_message_row(
+            user, row["local_id"], local_type=3, shard=row.get("shard")
+        )
+        if not raw:
+            return None
+        files = self.media._image_files(user, self.media._img_md5(raw))
+        target = files.get("original") or files.get("mid") or files.get("thumb")
+        if not target:
+            return None
+        arguments: dict[str, Any] = {}
+        probe = self.media._probe_ct(target[0])
+        if probe:
+            key, xor = self._keys.resolve(self.media, probe)
+            arguments.update(aes_key=key, xor_key=xor)
+        result = self.media.download_image_original(
+            user,
+            row["local_id"],
+            shard=row.get("shard"),
+            chat_name=name,
+            timeout=15,
+            max_scrolls=2,
+            **arguments,
+        )
+        return Path(result) if result else None

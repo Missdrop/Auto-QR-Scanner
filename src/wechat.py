@@ -22,6 +22,14 @@ class WeChat:
         self._stop = Event()
         self._thread: Thread | None = None
         self._seen: set[str] = set()
+        self._feedback: Any = None
+
+    def decoded(self, message_id: str) -> None:
+        if self._feedback is not None:
+            try:
+                self._feedback.put_nowait(message_id)
+            except (OSError, ValueError):
+                pass
 
     def start(
         self,
@@ -29,6 +37,7 @@ class WeChat:
         receive: Callable[[ImageMessage], None],
         notify: Callable[[str], None],
         latest_only: bool = False,
+        download_originals: bool = False,
     ) -> None:
         if self._thread is not None and self._thread.is_alive():
             raise ValueError("Monitoring is already running")
@@ -37,6 +46,7 @@ class WeChat:
             raise ValueError("Enter at least one exact group name")
 
         self._stop.clear()
+        self._download_originals = download_originals
         self._seen.clear()
         self._thread = Thread(
             target=self._run,
@@ -69,12 +79,21 @@ class WeChat:
 
         context = multiprocessing.get_context("spawn")
         output = context.Queue(maxsize=128)
+        self._feedback = context.Queue()
         stopped = context.Event()
         process = context.Process(
             target=read_database,
-            args=(names, self._image_directory, latest_only, output, stopped),
+            args=(
+                names,
+                self._image_directory,
+                latest_only,
+                output,
+                stopped,
+                self._feedback,
+                getattr(self, "_download_originals", False),
+            ),
             name="wechat-database",
-            daemon=True,
+            daemon=False,
         )
         stopped_message = "Monitoring stopped"
         try:
@@ -99,13 +118,16 @@ class WeChat:
         finally:
             stopped.set()
             if process.pid is not None:
-                process.join(timeout=1)
+                process.join(timeout=4)
                 if process.is_alive():
                     process.terminate()
                     process.join(timeout=2)
                 process.close()
             output.close()
             output.cancel_join_thread()
+            self._feedback.close()
+            self._feedback.cancel_join_thread()
+            self._feedback = None
             notify(stopped_message)
 
     def _run_ui(

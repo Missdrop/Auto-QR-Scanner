@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .message import ImageMessage
+from .outcome import Outcome
 from .result import Code, ScanResult
 
 
@@ -36,7 +37,20 @@ class History:
                     duplicate INTEGER NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS codes_text ON codes(text);
+                CREATE TABLE IF NOT EXISTS outcomes (
+                    url TEXT PRIMARY KEY, status TEXT NOT NULL,
+                    code INTEGER, message TEXT NOT NULL
+                );
+                UPDATE outcomes SET status = 'cancelled'
+                    WHERE status IN ('queued', 'processing');
             """)
+
+        with self._connect() as connection:
+            columns = {row[1] for row in connection.execute("PRAGMA table_info(scans)")}
+            if "warning" not in columns:
+                connection.execute(
+                    "ALTER TABLE scans ADD COLUMN warning TEXT NOT NULL DEFAULT ''"
+                )
 
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection]:
@@ -55,7 +69,7 @@ class History:
             # Serialize the lookup and insert to keep duplicate flags consistent.
             connection.execute("BEGIN IMMEDIATE")
             cursor = connection.execute(
-                "INSERT INTO scans VALUES (NULL, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO scans VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     message.message_id,
                     message.chat_name,
@@ -63,6 +77,7 @@ class History:
                     message.received_at.isoformat(),
                     result.elapsed_ms,
                     result.error,
+                    result.warning,
                 ),
             )
             result.record_id = cursor.lastrowid
@@ -99,6 +114,34 @@ class History:
                     datetime.fromisoformat(row[4]),
                 )
                 codes = [Code(text, bool(duplicate)) for text, duplicate in code_rows]
-                results.append(ScanResult(message, codes, row[5], row[6], row[0]))
+                results.append(
+                    ScanResult(message, codes, row[5], row[6], row[0], row[7])
+                )
 
         return results
+
+    def save_outcome(self, outcome: Outcome) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT INTO outcomes VALUES (?, ?, ?, ?) ON CONFLICT(url) "
+                "DO UPDATE SET status=excluded.status, code=excluded.code, "
+                "message=excluded.message",
+                (outcome.url, outcome.status, outcome.code, outcome.message),
+            )
+
+    def outcomes(self) -> list[Outcome]:
+        with self._connect() as connection:
+            return [
+                Outcome(*row)
+                for row in connection.execute(
+                    "SELECT url, status, code, message FROM outcomes"
+                )
+            ]
+
+    def outcome(self, url: str) -> Outcome | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT url, status, code, message FROM outcomes WHERE url = ?",
+                (url,),
+            ).fetchone()
+        return Outcome(*row) if row else None
