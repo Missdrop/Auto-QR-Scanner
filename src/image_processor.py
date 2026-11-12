@@ -54,3 +54,24 @@ class ImageProcessor:
         # Gentle smoothing can reduce interference from photographed screens.
         yield cv2.GaussianBlur(resized, (3, 3), 0)
         yield 255 - resized
+
+    def regions(self, image: Image) -> Iterator[Image]:
+        # Crop before enlarging: a small projected symbol otherwise remains tiny
+        # when the entire classroom photo reaches the working-resolution limit.
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        height, width = gray.shape
+        for top in (0.0, 0.2, 0.4):
+            for left in (0.0, 0.2, 0.4):
+                crop = gray[
+                    int(height * top) : int(height * (top + 0.6)),
+                    int(width * left) : int(width * (left + 0.6)),
+                ]
+                if not crop.size:
+                    continue
+                scale = min(6.0, 1400 / max(crop.shape))
+                enlarged = cv2.resize(
+                    crop, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC
+                )
+                yield enlarged
+                smooth = cv2.GaussianBlur(enlarged, (0, 0), 1.2)
+                yield cv2.addWeighted(enlarged, 1.8, smooth, -0.8, 0)
