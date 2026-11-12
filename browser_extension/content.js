@@ -9,10 +9,12 @@ function readSession() {
         if (mobile?.token && mobile?.userId) return mobile;
         const desktop = JSON.parse(localStorage.getItem("userInfo") || "null");
         const rawToken = localStorage.getItem("Token");
-        if (!desktop?.userId || !rawToken) return null;
+        // AMS desktop identifies the student with sourceId; mobile uses userId.
+        const userId = desktop?.userId ?? desktop?.sourceId;
+        if (!userId || !rawToken) return null;
         let token = rawToken;
         try { token = JSON.parse(rawToken); } catch { /* Plain strings are also used. */ }
-        return { userId: desktop.userId, token };
+        return { userId, token };
     } catch {
         return null;
     }

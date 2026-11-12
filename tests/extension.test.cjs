@@ -125,3 +125,13 @@ test("session diagnostics expose field names without student or token values", a
     assert.ok(!JSON.stringify(diagnostic).includes("private-token-value"));
     assert.ok(!JSON.stringify(diagnostic).includes("private-student-value"));
 });
+
+test("AMS desktop sourceId is normalized to the student identifier", async () => {
+    const { context, desktopStored, events } = createPage();
+    desktopStored.set("Token", "plain-token");
+    desktopStored.set("userInfo", JSON.stringify({ sourceId: "desktop-student" }));
+    await vm.runInContext("synchronize()", context);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].userId, "desktop-student");
+    assert.equal(events[0].token, "plain-token");
+});
