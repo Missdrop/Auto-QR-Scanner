@@ -48,7 +48,12 @@ class ConversationInput(QPlainTextEdit):
         self._model.setStringList(labels)
         if labels and self.isEnabled():
             self._completer.setCompletionPrefix(query)
-            self._completer.complete(self.cursorRect())
+            # A text cursor is only a few pixels wide; do not use that as popup width.
+            rectangle = self.cursorRect()
+            width = max(320, min(self.viewport().width(), 720))
+            rectangle.setWidth(width)
+            self._completer.popup().setMinimumWidth(width)
+            self._completer.complete(rectangle)
         else:
             self._completer.popup().hide()
 
