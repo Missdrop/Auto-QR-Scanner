@@ -36,6 +36,7 @@ class Window(QMainWindow):
     files_requested = Signal(list)
     retry_requested = Signal(object)
     login_requested = Signal()
+    pairing_requested = Signal()
     student_open_requested = Signal(str)
     closing = Signal()
 
@@ -89,6 +90,7 @@ class Window(QMainWindow):
         self._button("Scan images", self._select_images, controls)
         self._button("Scan folder", self._select_folder, controls)
         self._button("Student login", self.login_requested.emit, controls)
+        self._button("Copy browser pairing code", self.pairing_requested.emit, controls)
         layout.addLayout(controls)
         layout.addWidget(self._automatic)
         layout.addWidget(self._student_status)
