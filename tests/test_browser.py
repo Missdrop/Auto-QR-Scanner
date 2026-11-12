@@ -29,3 +29,18 @@ class BrowserTest(unittest.TestCase):
             browser.open("https://ams.xjtlu.edu.cn/studenth5/")
             browser.open("https://ams.xjtlu.edu.cn/studenth5/")
         start.assert_called_once()
+
+    def test_active_login_cannot_share_its_profile_with_qr_processing(self):
+        with patch("src.browser.subprocess.Popen") as start:
+            start.return_value.poll.return_value = None
+            browser = Browser(Path("data/student"))
+            browser.open("https://ams.xjtlu.edu.cn/studenth5/")
+            with self.assertRaisesRegex(RuntimeError, "Close Student login"):
+                browser.process("example")
+
+    def test_qr_processing_delegates_to_chromium_without_a_token_argument(self):
+        with patch("src.browser.StudentPage") as page:
+            page.return_value.process.return_value = (1001, "Expired")
+            browser = Browser(Path("data/student"))
+            self.assertEqual(browser.process("example"), (1001, "Expired"))
+        page.return_value.process.assert_called_once_with("example")

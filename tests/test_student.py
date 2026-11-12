@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from threading import Event
 from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -94,7 +95,9 @@ class StudentTest(unittest.TestCase):
         self.student._receive(
             {"event": "session", "userId": "student", "token": "secret"}
         )
-        with patch.object(self.student._ams, "process", return_value=(1001, "Expired")):
+        with patch.object(
+            self.student._browser, "process", return_value=(1001, "Expired")
+        ):
             self.student.open(HOME_URL + "#/?state=old-code")
             self.student._request_thread.join(timeout=1)
         self.assertIn("Platform rejected", self.messages[-1])
@@ -105,7 +108,9 @@ class StudentTest(unittest.TestCase):
         self.student._receive(
             {"event": "session", "userId": "student", "token": "secret"}
         )
-        with patch.object(self.student._ams, "process", return_value=(401, "Expired")):
+        with patch.object(
+            self.student._browser, "process", return_value=(401, "Expired")
+        ):
             self.student.open(HOME_URL + "#/?state=old-code")
             self.student._request_thread.join(timeout=1)
         self.assertEqual(self.student._session, {})
@@ -115,14 +120,14 @@ class StudentTest(unittest.TestCase):
         self.student.start(port=0)
         self.student._receive({"event": "session", "userId": "student", "token": "old"})
 
-        def refresh_during_request(state, token):
+        def refresh_during_request(state):
             self.student._receive(
                 {"event": "session", "userId": "student", "token": "new"}
             )
             return 401, "Expired"
 
         with patch.object(
-            self.student._ams, "process", side_effect=refresh_during_request
+            self.student._browser, "process", side_effect=refresh_during_request
         ):
             self.student.open(HOME_URL + "#/?state=old-code")
             self.student._request_thread.join(timeout=1)
@@ -135,3 +140,30 @@ class StudentTest(unittest.TestCase):
         self.assertNotIn("success page", self.messages[-1])
         with self.assertRaises(ValueError):
             self.student._receive({"event": "success"})
+
+    def test_consecutive_codes_are_processed_in_order_without_dropping_them(self):
+        self.student.start(port=0)
+        self.student._receive(
+            {"event": "session", "userId": "student", "token": "secret"}
+        )
+        started, released = Event(), Event()
+        states = []
+
+        def process(state):
+            states.append(state)
+            if state == "first":
+                started.set()
+                released.wait(2)
+            return 1001, "Expired"
+
+        with patch.object(self.student._browser, "process", side_effect=process):
+            try:
+                self.student.open(HOME_URL + "#/?state=first")
+                self.assertTrue(started.wait(1))
+                self.student.open(HOME_URL + "#/?state=second")
+                self.student.open(HOME_URL + "#/?state=third")
+                self.assertIn("queued", self.messages[-1])
+            finally:
+                released.set()
+                self.student._request_thread.join(timeout=2)
+        self.assertEqual(states, ["first", "second", "third"])

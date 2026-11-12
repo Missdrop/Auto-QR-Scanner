@@ -21,7 +21,7 @@ uv run --extra wechat python -m src
 3. 点击 **Start monitoring**。默认后台读取所选聊天的消息库和本地图片缓存，不要求聊天在前台；启动时跳过旧消息。
 4. **Scan latest chat image** 主动扫描所选聊天最近的他人图片，可用于验证旧消息，不自动请求平台。
 5. **Scan images / Scan folder** 扫描本地图片，不自动请求平台。
-6. 勾选 **Process new AMS codes in student session** 后，新消息中未重复的 AMS 二维码可使用学生会话请求学校现有 HTTPS 接口，显示服务器结果。
+6. 勾选 **Process new AMS codes in student session** 后，新消息中未重复的 AMS 二维码会交给后台 Chromium，复用登录资料请求学校接口，并在主界面显示服务器结果。连续二维码按顺序处理。
 7. 选中记录后可复制内容、打开链接、点击 **Process with student account** 或重新识别图片。
 
 命令行只识别，不访问学校接口：
@@ -35,9 +35,9 @@ uv run python -m src --scan "C:\photos\example.jpg"
 - 微信 `4.2.0.52`：已实测切到其他群并最小化后，仍可读取目标私聊旧图片、解密缓存并识别二维码。
 - 后台增量查询、旧消息跳过、缓存等待与取消逻辑有自动化测试；尚未用新发送的有效二维码完成整个实时流程。
 - 14 张拍屏样图此前全部识别成功，平均约 58 ms；不代表所有图片识别率或端到端耗时。
-- 已用保存的学生会话取得服务器的旧二维码过期响应。有效二维码成功处理仍未验证。
+- 已用目标私聊旧消息实测完整链路：后台读取图片、解密缓存、识别二维码、Chromium 发出请求、主界面显示学校返回的二维码过期提示。有效二维码成功处理仍未验证。
 - 已验证独立 Chromium 登录、关闭窗口后的会话同步和 DPAPI 加密保存；使用本次登录会话访问学校课表接口返回成功码 `0`。兼容旧版 LevelDB 和新版 SQLite/Zstandard 本地存储。浏览器运行时锁住 SQLite 文件，因此需要关闭窗口后同步。
-- 图片中的二维码由本地解码器识别；目前平台请求由 Python HTTPS 客户端执行，尚未改为 Chromium 页面执行。
+- 图片中的二维码由本地解码器识别；后续认证请求由 Chromium 页面中的 `fetch` 执行。真实 Chromium 的隔离测试覆盖成功、过期、未登录、错误响应和大小限制；成功分支测试使用模拟响应，不代表学校实测成功。
 
 ## 数据和限制
 
@@ -47,10 +47,12 @@ uv run python -m src --scan "C:\photos\example.jpg"
 - `wechat` 保存解密数据库缓存与密钥缓存，可能包含整个消息分片；程序只向扫描流程输出选定聊天的图片。密钥使用 Windows DPAPI 保护，解密数据库本身是本地明文缓存。
 - `student/session.bin` 保存 DPAPI 加密的 AMS 会话；`student/login.key` 用于登录辅助进程与本机程序通信。
 - `student/chromium` 是独立 Chromium 资料目录。会话同步仅筛选 AMS 来源的 `Token`、`userInfo` 存储项，不读取密码库或其他浏览器资料目录。
+- 登录窗口与后台处理共用同一资料目录，处理二维码前请关闭登录窗口。二维码处理时不显示浏览器窗口，不需要扩展。Playwright 仅用于驱动已安装的独立 Chromium，不下载或启动 Chrome for Testing。
 - 本机接口绑定 `127.0.0.1:52841`，要求随机登录密钥，不提供浏览器跨域接口。
 - 微信未缓存的图片会等待最多 60 秒，仍未落盘则提示手动打开图片后重试；不会偷偷切换聊天或调用界面下载。
 - 支持普通二维码，不支持微信小程序专用码。模糊、遮挡或反光可能无法恢复。
 - 扫描队列最多 64 张。关闭后未处理队列不保留，可从保存的图片重试。
+- 平台请求顺序执行，最多等待 64 个二维码；关闭程序会取消等待队列，已发出的请求等待返回。网络错误不会自动重试，避免重复请求；未确认结果的记录可手动重试。
 - 界面最多显示 2000 行，启动加载最近 500 次扫描，完整历史仍在数据库中。
 - 令牌通过 `X-Token` 请求头发往学校 HTTPS 接口，不拼入浏览器地址；认证请求不跟随重定向。服务器拒绝会话时提示重新登录，不自动重放旧码。
 
@@ -64,5 +66,7 @@ uv run --extra wechat ruff format --check .
 uv run --extra wechat pyrefly check
 uv run --extra wechat python -W error::ResourceWarning -m unittest discover -s tests -v
 ```
+
+安装 Chromium 后，使用 `$env:QR_BROWSER_TESTS='1'` 再运行测试，可启用浏览器隔离测试。测试拦截全部网络请求，不访问真实学校接口。
 
 遵守 [CONTRIBUTING.md](CONTRIBUTING.md) 中的分支、提交和 PR 要求。第三方来源见 [THIRD_PARTY.md](THIRD_PARTY.md)。

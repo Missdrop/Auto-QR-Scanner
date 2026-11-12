@@ -1,6 +1,7 @@
 import hmac
 import json
 import secrets
+from collections import deque
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -18,8 +19,8 @@ class Student:
     """
     Receive sessions from the integrated login window over authenticated loopback.
 
-    Login stays in the normal browser. QR results come from the existing AMS HTTPS
-    endpoint. Session values use Windows DPAPI; passwords are never read.
+    Login and authenticated QR requests run in the managed Chromium profile.
+    Session metadata uses Windows DPAPI; passwords are never read.
     """
 
     def __init__(self, directory: Path, notify: Callable[[str], None]) -> None:
@@ -28,6 +29,10 @@ class Student:
         self._browser = Browser(directory)
         self._ams = Ams()
         self._processing = Lock()
+        self._queue_lock = Lock()
+        self._pending: deque[tuple[str, str]] = deque()
+        self._running = False
+        self._closed = False
         self._request_thread: Thread | None = None
         self._store = SecretStore(directory / "session.bin")
         self._session = self._store.load()
@@ -59,9 +64,14 @@ class Student:
         self._thread.start()
 
     def open(self, url: str = HOME_URL) -> None:
+        if self._closed:
+            raise ValueError("The student browser has been closed")
         if not self.is_student_url(url):
             raise ValueError("Only HTTPS XJTLU AMS student URLs can open automatically")
         self.start()
+        if url == HOME_URL and self._processing.locked():
+            self._notify("Wait for the Chromium request before opening Student login")
+            return
         with self._lock:
             student = dict(self._session)
         if url != HOME_URL and not student:
@@ -70,19 +80,7 @@ class Student:
 
         if url != HOME_URL:
             state = self._ams.state(url)
-            if not self._processing.acquire(blocking=False):
-                self._notify(
-                    "A student request is running; retry this record afterwards"
-                )
-                return
-            self._notify("Student session available; waiting for the platform result")
-            self._request_thread = Thread(
-                target=self._process,
-                args=(state, student["token"]),
-                name="student-request",
-                daemon=True,
-            )
-            self._request_thread.start()
+            self._enqueue(state, student["token"])
             return
         self._notify(
             "Sign in using Chromium, then close its window to synchronize the session"
@@ -90,9 +88,43 @@ class Student:
         if not self._browser.open(url):
             self._notify("Cannot open the student page; check the installed browser")
 
+    def _enqueue(self, state: str, token: str) -> None:
+        with self._queue_lock:
+            if len(self._pending) >= 64:
+                self._notify("Student queue is full; retry this record manually")
+                return
+            self._pending.append((state, token))
+            if self._running:
+                self._notify("QR code queued for Chromium processing")
+                return
+            self._running = True
+            self._processing.acquire()
+            self._notify("Student session available; waiting for the platform result")
+            self._request_thread = Thread(
+                target=self._drain,
+                name="student-request",
+                daemon=True,
+            )
+            self._request_thread.start()
+
+    def _drain(self) -> None:
+        while True:
+            with self._queue_lock:
+                if not self._pending:
+                    self._running = False
+                    self._processing.release()
+                    return
+                state, token = self._pending.popleft()
+            with self._lock:
+                available = bool(self._session)
+            if available:
+                self._process(state, token)
+            else:
+                self._notify("Login required; retry pending records after signing in")
+
     def _process(self, state: str, token: str) -> None:
         try:
-            code, message = self._ams.process(state, token)
+            code, message = self._browser.process(state)
             if code == 401:
                 with self._lock:
                     current = self._session.get("token") == token
@@ -111,13 +143,13 @@ class Student:
                 self._notify("Platform confirmed successful processing: " + message)
             else:
                 self._notify("Platform rejected the QR code: " + message)
+        except RuntimeError as exception:
+            self._notify(str(exception))
         except Exception as exception:
             self._notify(
                 f"Cannot obtain a platform result: {type(exception).__name__}. "
                 "Inspect the student login and retry manually."
             )
-        finally:
-            self._processing.release()
 
     @staticmethod
     def is_student_url(url: str) -> bool:
@@ -203,8 +235,11 @@ class Student:
         return "Student login required"
 
     def close(self) -> None:
+        self._closed = True
+        with self._queue_lock:
+            self._pending.clear()
         if self._request_thread is not None:
-            self._request_thread.join(timeout=12)
+            self._request_thread.join(timeout=35)
         if self._server is not None:
             self._server.shutdown()
             self._server.server_close()

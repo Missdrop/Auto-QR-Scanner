@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 from .runtime import Chromium
+from .student_page import StudentPage
 
 
 class Browser:
@@ -26,3 +27,8 @@ class Browser:
             stderr=subprocess.DEVNULL,
         )
         return True
+
+    def process(self, state: str) -> tuple[int, str]:
+        if self._process is not None and self._process.poll() is None:
+            raise RuntimeError("Close Student login before processing a QR code")
+        return StudentPage(self._directory).process(state)
