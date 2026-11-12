@@ -11,6 +11,11 @@ dependencies = [
     "zxing-cpp>=3.1.1",
 ]
 
+[project.optional-dependencies]
+wechat = [
+    "wxauto4>=41.1.7 ; sys_platform == 'win32'",
+]
+
 [dependency-groups]
 dev = [
     "pyrefly>=1.4.1",
