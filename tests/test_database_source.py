@@ -68,3 +68,21 @@ class DatabaseSourceTest(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             self.source.image("chat", {"local_id": 1})
         self.source.media.download_image_original.assert_not_called()
+
+    def test_thumbnail_mode_never_selects_an_existing_original(self):
+        with tempfile.TemporaryDirectory() as directory:
+            image = Path(directory) / "thumb.jpg"
+            image.write_bytes(b"thumbnail")
+            self.source.thumbnail_only = True
+            self.source.media._image_files.return_value = {
+                "thumb": (str(image), 9),
+                "original": ("original.dat", 1000),
+            }
+            self.source.media._probe_ct.return_value = None
+            self.source.media.download_image.return_value = str(image)
+            self.source.image("chat", {"local_id": 1})
+            self.source.media.download_image.assert_called_once_with(
+                "chat", 1, shard=None, tier="thumb"
+            )
+            self.source.media._probe_ct.assert_called_once_with(str(image))
+            self.source.media.download_image_original.assert_not_called()

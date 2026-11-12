@@ -59,6 +59,7 @@ class DatabaseReader:
     def run(self, names: list[str], latest_only: bool) -> None:
         self.notice("Preparing background database access; WeChat can stay minimized")
         source = DatabaseSource(self._images.parent / "wechat", self._images)
+        source.thumbnail_only = self._downloads is None
         users = {name: source.resolve(name) for name in names}
         sequences = {}
         pending: dict[str, tuple[str, DatabasePhoto, float]] = {}

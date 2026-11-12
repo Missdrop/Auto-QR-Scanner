@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from pathlib import Path
 
 from PySide6.QtCore import QSettings, Qt, Signal
 from PySide6.QtGui import QCloseEvent
@@ -7,7 +6,6 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QCheckBox,
-    QFileDialog,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -36,7 +34,6 @@ class Window(QMainWindow):
     start_requested = Signal(list)
     latest_requested = Signal(list)
     stop_requested = Signal()
-    files_requested = Signal(list)
     retry_requested = Signal(object)
     login_requested = Signal()
     student_open_requested = Signal(str)
@@ -58,10 +55,12 @@ class Window(QMainWindow):
         self._groups.setMaximumHeight(100)
         self._automatic = QCheckBox("识别后自动扫码")
         self._automatic.setChecked(True)
-        self._originals = QCheckBox("同时下载原图（会短暂打开微信图片窗口）")
+        self._originals = QCheckBox(
+            "使用原图（分辨率高，但会短暂打开微信图片窗口，取消勾选则只扫描缩略图）"
+        )
         self._originals.setChecked(True)
         self._status = QLabel("就绪")
-        self._student_status = QLabel("浏览器资料保存在本机")
+        self._student_status = QLabel("")
         self._student_status.setWordWrap(True)
         self._table = self._create_table()
         self._details = QPlainTextEdit()
@@ -108,8 +107,6 @@ class Window(QMainWindow):
         )
         self._stop = self._button("停止", self.stop_requested.emit, controls)
         self._stop.setEnabled(False)
-        self._button("仅识别本地图片", self._select_images, controls)
-        self._button("仅识别图片文件夹", self._select_folder, controls)
         self._button("打开内置浏览器", self.login_requested.emit, controls)
         layout.addLayout(controls)
         layout.addWidget(self._automatic)
@@ -145,26 +142,6 @@ class Window(QMainWindow):
         groups = self._groups.toPlainText()
         self._settings.setValue("groups", groups)
         self.start_requested.emit(groups.splitlines())
-
-    def _select_images(self) -> None:
-        files, _ = QFileDialog.getOpenFileNames(
-            self,
-            "仅识别本地图片",
-            "",
-            "图片 (*.png *.jpg *.jpeg *.bmp *.webp)",
-        )
-        if files:
-            self.files_requested.emit([Path(name) for name in files])
-
-    def _select_folder(self) -> None:
-        directory = QFileDialog.getExistingDirectory(self, "选择图片文件夹")
-        if directory:
-            paths = sorted(
-                path
-                for path in Path(directory).iterdir()
-                if path.suffix.lower() in {".png", ".jpg", ".jpeg", ".bmp", ".webp"}
-            )
-            self.files_requested.emit(paths)
 
     def automatic_open(self) -> bool:
         return self._automatic.isChecked()

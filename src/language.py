@@ -8,9 +8,6 @@ def chinese(message: str) -> str:
             "当前为低分辨率图片，正在等待更清晰的缓存版本"
         ),
         "Ready": "就绪",
-        "Browser profile saved; sign in on any site inside the browser": (
-            "浏览器资料保存在本机，可打开内置浏览器访问网站并登录"
-        ),
         "Close the built-in browser before background processing": (
             "请先关闭内置浏览器窗口，再重试后台扫码；登录状态会保留"
         ),

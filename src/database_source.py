@@ -39,6 +39,7 @@ class DatabaseSource:
         self.db = module.WeChatDB(workdir=str(directory))
         self.media = media.MediaDownloader(self.db, save_dir=str(images))
         self._keys = ImageKeys(directory / "image-key.bin")
+        self.thumbnail_only = False
 
     def resolve(self, name: str) -> str:
         contacts = self.db.search_contact(name)
@@ -61,14 +62,22 @@ class DatabaseSource:
         return [DatabasePhoto(self, user, row) for row in rows]
 
     def image(self, user: str, row: dict[str, Any]) -> Path:
-        arguments = {"shard": row.get("shard"), "tier": "best"}
+        thumbnail_only = getattr(self, "thumbnail_only", False)
+        arguments = {
+            "shard": row.get("shard"),
+            "tier": "thumb" if thumbnail_only else "best",
+        }
         raw = self.db.get_message_row(
             user, row["local_id"], local_type=3, shard=row.get("shard")
         )
         if not raw:
             raise ValueError("The image message is no longer available")
         files = self.media._image_files(user, self.media._img_md5(raw))
-        target = files.get("original") or files.get("mid") or files.get("thumb")
+        target = (
+            files.get("thumb")
+            if thumbnail_only
+            else (files.get("original") or files.get("mid") or files.get("thumb"))
+        )
         if not target:
             raise FileNotFoundError("WeChat has not cached this image yet")
         probe = self.media._probe_ct(target[0])
