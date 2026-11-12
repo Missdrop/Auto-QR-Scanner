@@ -29,6 +29,7 @@ class WeChat:
         chat_names: list[str],
         receive: Callable[[ImageMessage], None],
         notify: Callable[[str], None],
+        latest_only: bool = False,
     ) -> None:
         if self._thread is not None and self._thread.is_alive():
             raise ValueError("Monitoring is already running")
@@ -40,7 +41,7 @@ class WeChat:
         self._seen.clear()
         self._thread = Thread(
             target=self._run,
-            args=(names, receive, notify),
+            args=(names, receive, notify, latest_only),
             name="wechat-monitor",
             daemon=True,
         )
@@ -63,6 +64,7 @@ class WeChat:
         names: list[str],
         receive: Callable[[ImageMessage], None],
         notify: Callable[[str], None],
+        latest_only: bool = False,
     ) -> None:
         client: Any = None
         com: Any = None
@@ -79,10 +81,10 @@ class WeChat:
             # WeChat 4.2 exposes virtual controls without native window handles.
             # Keep the existing window size instead of resizing a virtual control.
             client = module.WeChat(resize=False, ads=False, start_listener=False)
-            if module.__name__ == "wxautox4":
+            if module.__name__ == "wxautox4" and not latest_only:
                 self._listen(client, names, receive, notify)
             else:
-                self._poll(client, names, receive, notify)
+                self._poll(client, names, receive, notify, latest_only)
         except Exception as exception:
             reason = f"{type(exception).__name__}: {exception}"
             stopped_message = (
@@ -139,23 +141,48 @@ class WeChat:
         names: list[str],
         receive: Callable[[ImageMessage], None],
         notify: Callable[[str], None],
+        latest_only: bool = False,
     ) -> None:
         if len(names) != 1:
             raise ValueError("The free backend supports one group at a time")
         name = names[0]
         client.ChatWith(name, exact=True)
-        info = client.ChatInfo()
-        if info.get("chat_name") != name or info.get("chat_type") != "group":
-            raise ValueError("Selected chat is not the requested group")
+        from .passive_chat import PassiveChat
 
-        # Snapshot visible messages before monitoring; never process old history.
-        for message in client.GetAllMessage():
-            self._seen.add(name + ":" + str(message.id))
-        notify("Monitoring group; keep the selected WeChat chat open")
+        reader = PassiveChat(client, self._image_directory, notify)
+        if reader.name() != name:
+            raise ValueError("Selected chat is not the requested conversation")
+
+        if latest_only:
+            if not reader.is_foreground():
+                raise ValueError("Bring the requested conversation to the foreground")
+            for message in reversed(reader.messages()):
+                if message.type == "image" and message.attr == "friend":
+                    self._receive(message, name, receive, notify)
+                    return
+            raise ValueError("No visible incoming image in this conversation")
+
+        # Snapshot identifiers only: backend message constructors may click avatars.
+        for message in reader.messages():
+            self._seen.add(name + ":" + message.id)
+        notify("Monitoring conversation; keep WeChat visible and in the foreground")
+        paused = False
         while not self._stop.wait(0.3):
-            if client.ChatInfo().get("chat_name") != name:
+            if reader.name() != name:
                 raise RuntimeError("The active WeChat chat changed; restart monitoring")
-            for message in client.GetAllMessage():
+            if not reader.is_foreground():
+                if not paused:
+                    notify(
+                        "Monitoring paused; bring the selected chat to the foreground"
+                    )
+                paused = True
+                continue
+            if paused:
+                notify("Monitoring conversation; WeChat is in the foreground")
+                paused = False
+            for message in reader.messages():
+                if self._stop.is_set():
+                    break
                 self._receive(message, name, receive, notify)
 
     def _receive(
@@ -170,11 +197,13 @@ class WeChat:
         if key in self._seen:
             return
         self._seen.add(key)
-        if message.attr != "friend" or message.type != "image":
+        if message.type != "image":
             return
         received_at = datetime.now().astimezone()
 
         try:
+            if message.attr != "friend":
+                return
             source = Path(message.download())
             if not source.is_file():
                 raise ValueError("Downloaded image is missing")
