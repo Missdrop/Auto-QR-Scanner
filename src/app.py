@@ -141,11 +141,9 @@ class App(QObject):
             for code in result.codes:
                 if Student.is_web_url(code.text):
                     previous = self._history.outcome(code.text)
-                    if previous is None or previous.status in {
-                        "error",
-                        "login",
-                        "cancelled",
-                    }:
+                    # Another image version must not replay an uncertain request.
+                    # Existing attempts can be retried explicitly from the record.
+                    if previous is None:
                         self._open_student(code.text)
 
     def _show_outcome(self, outcome: Outcome) -> None:

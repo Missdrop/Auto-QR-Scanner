@@ -133,6 +133,38 @@ class AppTest(unittest.TestCase):
                 controller.close()
                 window.close()
 
+    def test_another_image_version_does_not_replay_a_failed_request(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            window = Window(
+                QSettings(str(root / "settings.ini"), QSettings.Format.IniFormat)
+            )
+            history = History(root / "history.sqlite3")
+            controller = App(
+                WeChat(root / "images"),
+                Scanner(ImageProcessor()),
+                history,
+                window,
+                root / "profile",
+            )
+            url = "https://example.com/qr"
+            result = ScanResult(
+                ImageMessage("one", "Chat", root / "image.jpg", datetime.now()),
+                [Code(url)],
+            )
+            try:
+                for status in ["error", "login", "cancelled", "queued", "result"]:
+                    history.save_outcome(Outcome(url, status))
+                    with patch.object(controller._student, "open") as open_browser:
+                        controller._show_result(result, True)
+                        open_browser.assert_not_called()
+                with patch.object(controller._student, "open") as open_browser:
+                    controller._open_student(url)
+                    open_browser.assert_called_once_with(url)
+            finally:
+                controller.close()
+                window.close()
+
     def test_image_modes_can_be_combined_and_saved(self):
         with tempfile.TemporaryDirectory() as directory:
             settings = QSettings(
