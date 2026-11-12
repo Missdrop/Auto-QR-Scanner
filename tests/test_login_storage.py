@@ -1,8 +1,11 @@
 import json
+import sqlite3
 import struct
 import tempfile
 import unittest
 from pathlib import Path
+
+import zstandard
 
 from src.login_storage import LoginStorage
 
@@ -33,6 +36,41 @@ def write_log(path, sequence, entries):
 
 
 class LoginStorageTest(unittest.TestCase):
+    def test_sqlite_compressed_session_is_filtered_and_logout_is_detected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = Path(directory)
+            (profile / "Default").mkdir()
+            connection = sqlite3.connect(profile / "Default/LocalStorage")
+            connection.executescript(
+                "CREATE TABLE maps(row_id INTEGER, storage_key BLOB);"
+                "CREATE TABLE map_entries(map_id INTEGER, key BLOB, value BLOB, "
+                "value_compression_type INTEGER);"
+            )
+            connection.executemany(
+                "INSERT INTO maps VALUES (?, ?)",
+                [(1, b"https://ams.xjtlu.edu.cn/"), (2, b"https://other.test/")],
+            )
+            compressed = zstandard.ZstdCompressor().compress(
+                b'\x01{"sourceId":"student"}'
+            )
+            connection.executemany(
+                "INSERT INTO map_entries VALUES (?, ?, ?, ?)",
+                [
+                    (1, b"\x01Token", b"\x01example-token", 0),
+                    (1, b"\x01userInfo", compressed, 1),
+                    (2, b"\x01Token", b"\x01other-token", 0),
+                ],
+            )
+            connection.commit()
+            storage = LoginStorage(profile)
+            self.assertEqual(
+                storage.session(), {"userId": "student", "token": "example-token"}
+            )
+            connection.execute("DELETE FROM map_entries WHERE map_id = 1")
+            connection.commit()
+            self.assertIsNone(storage.session())
+            connection.close()
+
     def test_actual_leveldb_log_decodes_only_the_managed_ams_session(self):
         with tempfile.TemporaryDirectory() as directory:
             profile = Path(directory)

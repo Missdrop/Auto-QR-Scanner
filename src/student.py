@@ -84,7 +84,9 @@ class Student:
             )
             self._request_thread.start()
             return
-        self._notify("Complete student login in the integrated login window")
+        self._notify(
+            "Sign in using Chromium, then close its window to synchronize the session"
+        )
         if not self._browser.open(url):
             self._notify("Cannot open the student page; check the installed browser")
 

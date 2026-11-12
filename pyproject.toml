@@ -7,8 +7,8 @@ dependencies = [
     "dfindexeddb==20260210",
     "numpy>=2.2,<3",
     "opencv-python>=4.11,<5",
-    "playwright>=1.58,<2",
     "pyside6-essentials>=6.8,<6.9",
+    "zstandard>=0.23,<1",
     "zxing-cpp>=3.1.1",
 ]
 
