@@ -42,6 +42,7 @@ class DatabaseSource:
         self.media = media.MediaDownloader(self.db, save_dir=str(images))
         self._keys = ImageKeys(directory / "image-key.bin")
         self.thumbnail_only = False
+        self.image_mode = "original"
 
     def resolve(self, name: str) -> str:
         _, separator, identifier = name.rpartition(" [")
@@ -75,9 +76,12 @@ class DatabaseSource:
 
     def image(self, user: str, row: dict[str, Any]) -> Path:
         thumbnail_only = getattr(self, "thumbnail_only", False)
+        mode = (
+            "thumbnail" if thumbnail_only else getattr(self, "image_mode", "original")
+        )
         arguments = {
             "shard": row.get("shard"),
-            "tier": "thumb" if thumbnail_only else "best",
+            "tier": "thumb" if mode == "thumbnail" else "best",
         }
         raw = self.db.get_message_row(
             user, row["local_id"], local_type=3, shard=row.get("shard")
@@ -86,15 +90,21 @@ class DatabaseSource:
             raise ValueError("The image message is no longer available")
         files = self.media._image_files(user, self.media._img_md5(raw))
         tier = "thumb"
-        if not thumbnail_only:
+        if mode != "thumbnail":
             original = files.get("original")
-            if original and self.media.original_ready(
-                original[1], (files.get("mid") or (None, 0))[1]
+            if (
+                mode == "original"
+                and original
+                and self.media.original_ready(
+                    original[1], (files.get("mid") or (None, 0))[1]
+                )
             ):
                 tier = "original"
             elif "mid" in files:
                 tier = "mid"
         target = files.get(tier)
+        if mode == "compressed":
+            arguments["tier"] = tier
         if not target:
             raise FileNotFoundError("WeChat has not cached this image yet")
         probe = self.media._probe_ct(target[0])
