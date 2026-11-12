@@ -14,6 +14,7 @@ from src.app import App
 from src.history import History
 from src.image_processor import ImageProcessor
 from src.scanner import Scanner
+from src.student import Student
 from src.wechat import WeChat
 from src.window import Window
 
@@ -22,6 +23,17 @@ class AppTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.application = QApplication.instance() or QApplication([])
+
+    def setUp(self) -> None:
+        start = Student.start
+        bridge = patch.object(
+            Student,
+            "start",
+            autospec=True,
+            side_effect=lambda student: start(student, 0),
+        )
+        bridge.start()
+        self.addCleanup(bridge.stop)
 
     def test_local_image_reaches_window_without_opening_browser(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -37,6 +49,7 @@ class AppTest(unittest.TestCase):
                 root / "profile",
             )
             try:
+                self.assertIsNotNone(controller._student._server)
                 barcode = zxingcpp.create_barcode(
                     "https://example.com", zxingcpp.BarcodeFormat.QRCode
                 )
