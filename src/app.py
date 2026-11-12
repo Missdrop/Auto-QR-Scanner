@@ -3,7 +3,8 @@ from pathlib import Path
 from time import sleep
 from uuid import uuid4
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, QUrl, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication
 
 from .history import History
@@ -42,6 +43,7 @@ class App(QObject):
         self._wechat = wechat
         self._history = history
         self._window = window
+        self._image_directory = student_directory.parent / "images"
         self._student = Student(
             student_directory, self.student_notice.emit, self.platform_completed.emit
         )
@@ -66,8 +68,13 @@ class App(QObject):
         self._window.stop_requested.connect(self._wechat.stop)
         self._window.retry_requested.connect(self._submit_incoming)
         self._window.login_requested.connect(self._open_login)
+        self._window.image_folder_requested.connect(self._open_image_folder)
         self._window.student_open_requested.connect(self._open_student)
         self._window.closing.connect(self.close)
+
+    def _open_image_folder(self) -> None:
+        self._image_directory.mkdir(parents=True, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._image_directory.resolve())))
 
     def _start_monitoring(self, groups: list[str]) -> None:
         try:
