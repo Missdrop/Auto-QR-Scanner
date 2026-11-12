@@ -1,9 +1,12 @@
 import importlib
 import json
 import shutil
+import sqlite3
 import tempfile
 from pathlib import Path
 from typing import Any
+
+import zstandard
 
 
 class LoginStorage:
@@ -14,6 +17,7 @@ class LoginStorage:
     PREFIX = b"_https://ams.xjtlu.edu.cn\x00"
 
     def __init__(self, profile: Path) -> None:
+        self._database = profile / "Default/LocalStorage"
         self._directory = profile / "Default/Local Storage/leveldb"
 
     @staticmethod
@@ -45,8 +49,54 @@ class LoginStorage:
         }
 
     def session(self) -> dict[str, str] | None:
+        values = self._sqlite() if self._database.is_file() else self._leveldb()
+        return self._session(values)
+
+    def _sqlite(self) -> dict[str, str]:
+        # Chromium holds an exclusive lock while running. Retry after it closes;
+        # an unavailable database must never be interpreted as a logout.
+        if self._database.stat().st_size > 64 * 1024 * 1024:
+            raise ValueError("The managed login database exceeded its size limit")
+        connection = sqlite3.connect(
+            self._database.resolve().as_uri() + "?mode=ro", uri=True, timeout=1
+        )
+        try:
+            rows = connection.execute(
+                "SELECT key, value, value_compression_type FROM map_entries "
+                "JOIN maps ON map_id = row_id WHERE storage_key = ? "
+                "AND key IN (?, ?)",
+                (b"https://ams.xjtlu.edu.cn/", b"\x01Token", b"\x01userInfo"),
+            )
+            values = {}
+            for key, value, compression in rows:
+                if len(value) > 65536:
+                    raise ValueError("The managed session value is too large")
+                if compression == 1:
+                    size = zstandard.frame_content_size(value)
+                    if (
+                        size
+                        not in {
+                            zstandard.CONTENTSIZE_UNKNOWN,
+                            zstandard.CONTENTSIZE_ERROR,
+                        }
+                        and size > 65536
+                    ):
+                        raise ValueError("The decoded session value is too large")
+                    value = zstandard.ZstdDecompressor().decompress(
+                        value, max_output_size=65536
+                    )
+                elif compression != 0:
+                    raise ValueError("Unknown Chromium storage compression")
+                if len(value) > 65536:
+                    raise ValueError("The decoded session value is too large")
+                values[self.text(key)] = self.text(value)
+            return values
+        finally:
+            connection.close()
+
+    def _leveldb(self) -> dict[str, str]:
         if not self._directory.is_dir():
-            return None
+            return {}
         module = importlib.import_module("dfindexeddb.leveldb.record")
         with tempfile.TemporaryDirectory(prefix="autoqr-login-") as temporary:
             copied = []
@@ -68,6 +118,10 @@ class LoginStorage:
                 for record in module.LevelDBRecord.FromFile(target)
             )
             values = self.select(records)
+        return values
+
+    @staticmethod
+    def _session(values: dict[str, str]) -> dict[str, str] | None:
         if not values.get("Token") or not values.get("userInfo"):
             return None
         account = json.loads(values["userInfo"])

@@ -1,15 +1,15 @@
+import base64
 import hashlib
 import json
-import os
-import subprocess
-import sys
-from importlib.resources import files
+import tempfile
+import zipfile
 from pathlib import Path
+from urllib.request import urlopen
 
 
 class Chromium:
     """
-    Install and verify the Chromium revision supplied by the locked Playwright SDK.
+    Install a pinned unbranded Chromium build from the official snapshot archive.
     """
 
     def __init__(self, directory: Path | None = None) -> None:
@@ -19,11 +19,8 @@ class Chromium:
 
     @staticmethod
     def revision() -> str:
-        metadata = files("playwright").joinpath("driver/package/browsers.json")
-        browsers = json.loads(metadata.read_text(encoding="utf-8"))["browsers"]
-        return next(
-            browser["revision"] for browser in browsers if browser["name"] == "chromium"
-        )
+        metadata = Path(__file__).with_name("chromium.json")
+        return json.loads(metadata.read_text(encoding="utf-8"))["revision"]
 
     @staticmethod
     def digest(path: Path) -> str:
@@ -48,18 +45,44 @@ class Chromium:
 
     def install(self) -> None:
         self.directory.mkdir(parents=True, exist_ok=True)
-        environment = {
-            **os.environ,
-            "PLAYWRIGHT_BROWSERS_PATH": str(self.directory.resolve()),
-        }
-        subprocess.run(
-            [sys.executable, "-m", "playwright", "install", "--no-shell", "chromium"],
-            env=environment,
-            check=True,
-        )
-        candidates = list(
-            (self.directory / ("chromium-" + self.revision())).rglob("chrome.exe")
-        )
+        metadata = json.loads(Path(__file__).with_name("chromium.json").read_text())
+        destination = self.directory / ("chromium-" + self.revision())
+        destination.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=self.directory) as temporary:
+            archive = Path(temporary) / "chromium.zip"
+            checksum = hashlib.md5()
+            size = 0
+            progress = -1
+            with (
+                urlopen(metadata["url"], timeout=30) as response,
+                archive.open("wb") as stream,
+            ):
+                while block := response.read(1024 * 1024):
+                    stream.write(block)
+                    checksum.update(block)
+                    size += len(block)
+                    if size > metadata["size"]:
+                        raise ValueError("Chromium download exceeded its declared size")
+                    current = size * 10 // metadata["size"]
+                    if current != progress:
+                        print(f"Downloading Chromium: {current * 10}%", flush=True)
+                        progress = current
+            expected = base64.b64decode(metadata["md5"])
+            if size != metadata["size"] or checksum.digest() != expected:
+                raise ValueError("Chromium archive verification failed")
+            with zipfile.ZipFile(archive) as package:
+                total = 0
+                for member in package.infolist():
+                    target = (destination / member.filename).resolve()
+                    if not target.is_relative_to(destination.resolve()):
+                        raise ValueError("Chromium archive contains an unsafe path")
+                    total += member.file_size
+                    if total > 2 * 1024**3:
+                        raise ValueError(
+                            "Chromium archive expands beyond its size limit"
+                        )
+                package.extractall(destination)
+        candidates = list(destination.rglob("chrome.exe"))
         if len(candidates) != 1:
             raise ValueError("The downloaded Chromium executable is ambiguous")
         path = candidates[0]

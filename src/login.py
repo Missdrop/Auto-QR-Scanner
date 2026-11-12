@@ -12,7 +12,7 @@ from .runtime import Chromium
 
 class Login:
     """
-    Open ordinary Chrome without extensions, injected scripts or debugging flags.
+    Open standalone Chromium with a dedicated persistent login profile.
     """
 
     def __init__(self, directory: Path, port: int = 52841) -> None:
@@ -54,10 +54,11 @@ class Login:
         process = subprocess.Popen(
             [
                 str(self.executable()),
-                "--app=https://ams.xjtlu.edu.cn/studentpc/",
+                "--new-window",
                 "--user-data-dir=" + str(profile),
                 "--no-first-run",
                 "--no-default-browser-check",
+                "https://ams.xjtlu.edu.cn/studentpc/",
             ],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
@@ -68,7 +69,7 @@ class Login:
                 try:
                     self.inspect()
                 except Exception:
-                    # Chrome may be rotating a log; retry a fresh snapshot.
+                    # Chromium may hold its storage lock until the window closes.
                     pass
                 if process.poll() is not None:
                     self.inspect()
