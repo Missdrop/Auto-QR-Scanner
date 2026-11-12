@@ -54,3 +54,49 @@ test("manifest limits content scripts to AMS pages", () => {
     assert.deepEqual(manifest.permissions, ["storage"]);
     assert.ok(manifest.content_scripts[0].matches.every(url => url.startsWith("https://ams.xjtlu.edu.cn/")));
 });
+
+function createBackground() {
+    let listener;
+    const requests = [];
+    const context = vm.createContext({
+        URL,
+        fetch: async (url, options) => {
+            requests.push({ url, options });
+            return { ok: true };
+        },
+        chrome: {
+            storage: { local: {
+                get: async () => ({ pairing: "52841:example-pairing-key" }),
+                set: async () => {},
+            } },
+            runtime: { onMessage: { addListener: callback => { listener = callback; } } },
+        },
+    });
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "../browser_extension/background.js"), "utf8"), context);
+    return {
+        requests,
+        send: (message, sender) => new Promise(resolve => listener(message, sender, resolve)),
+    };
+}
+
+test("session forwarding uses the sender frame when tab URL is unavailable", async () => {
+    const background = createBackground();
+    const reply = await background.send(
+        { type: "event", payload: { event: "session", userId: "student", token: "secret" } },
+        { tab: { id: 1 }, url: "https://ams.xjtlu.edu.cn/studentpc/checkIn" },
+    );
+    assert.equal(reply.ok, true);
+    assert.equal(background.requests.length, 1);
+    assert.equal(background.requests[0].url, "http://127.0.0.1:52841/event");
+});
+
+test("background rejects events from other origins and non-student pages", async () => {
+    const background = createBackground();
+    for (const url of ["https://example.com/studentpc/", "https://ams.xjtlu.edu.cn/admin/"]) {
+        const reply = await background.send(
+            { type: "event", payload: { event: "success" } }, { tab: { id: 1 }, url },
+        );
+        assert.equal(reply.ok, false);
+    }
+    assert.equal(background.requests.length, 0);
+});
