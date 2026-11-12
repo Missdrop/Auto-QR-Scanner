@@ -4,9 +4,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError
-from urllib.parse import parse_qs, urlsplit
 from urllib.request import Request, urlopen
 
+from src.ams import Ams
 from src.student import HOME_URL, Student
 
 
@@ -62,7 +62,7 @@ class StudentTest(unittest.TestCase):
 
     def test_missing_login_does_not_open_a_code(self) -> None:
         self.student.start(port=0)
-        with patch("src.student.webbrowser.open") as browser:
+        with patch("src.student.Browser.open") as browser:
             self.student.open(HOME_URL + "#/?state=example")
             browser.assert_not_called()
         self.assertIn("Login required", self.messages[-1])
@@ -86,13 +86,47 @@ class StudentTest(unittest.TestCase):
         self.assertEqual(failure.exception.code, 400)
 
     def test_existing_state_is_preserved(self) -> None:
-        result = Student._authenticated_url(
-            HOME_URL + "#/?state=a%2Fb%3D&token=old",
-            {"userId": "student", "token": "secret"},
+        result = Ams.state(HOME_URL + "#/?state=a%2Fb%3D&token=old")
+        self.assertEqual(result, "a/b=")
+
+    def test_expired_qr_result_reaches_the_desktop(self) -> None:
+        self.student.start(port=0)
+        self.student._receive(
+            {"event": "session", "userId": "student", "token": "secret"}
         )
-        query = parse_qs(urlsplit(result).fragment.partition("?")[2])
-        self.assertEqual(query["state"], ["a/b="])
-        self.assertEqual(query["token"], ["secret"])
+        with patch.object(self.student._ams, "process", return_value=(1001, "Expired")):
+            self.student.open(HOME_URL + "#/?state=old-code")
+            self.student._request_thread.join(timeout=1)
+        self.assertIn("Platform rejected", self.messages[-1])
+        self.assertIn("Expired", self.messages[-1])
+
+    def test_platform_unauthorized_response_clears_the_session(self) -> None:
+        self.student.start(port=0)
+        self.student._receive(
+            {"event": "session", "userId": "student", "token": "secret"}
+        )
+        with patch.object(self.student._ams, "process", return_value=(401, "Expired")):
+            self.student.open(HOME_URL + "#/?state=old-code")
+            self.student._request_thread.join(timeout=1)
+        self.assertEqual(self.student._session, {})
+        self.assertIn("Login required", self.messages[-1])
+
+    def test_old_request_cannot_clear_a_refreshed_session(self) -> None:
+        self.student.start(port=0)
+        self.student._receive({"event": "session", "userId": "student", "token": "old"})
+
+        def refresh_during_request(state, token):
+            self.student._receive(
+                {"event": "session", "userId": "student", "token": "new"}
+            )
+            return 401, "Expired"
+
+        with patch.object(
+            self.student._ams, "process", side_effect=refresh_during_request
+        ):
+            self.student.open(HOME_URL + "#/?state=old-code")
+            self.student._request_thread.join(timeout=1)
+        self.assertEqual(self.student._session["token"], "new")
 
     def test_platform_status_is_separate_from_session(self) -> None:
         self.student._receive(

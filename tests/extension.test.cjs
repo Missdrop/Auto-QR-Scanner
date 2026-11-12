@@ -126,7 +126,7 @@ test("session diagnostics expose field names without student or token values", a
     assert.ok(!JSON.stringify(diagnostic).includes("private-student-value"));
 });
 
-test("AMS desktop sourceId is normalized to the student identifier", async () => {
+test("AMS desktop sourceId is retained as an opaque account reference", async () => {
     const { context, desktopStored, events } = createPage();
     desktopStored.set("Token", "plain-token");
     desktopStored.set("userInfo", JSON.stringify({ sourceId: "desktop-student" }));
