@@ -1,4 +1,4 @@
-from auto_qr_scanner.message import ImageMessage
+from .message import ImageMessage
 
 
 class Code:

@@ -26,7 +26,7 @@ uv run pyrefly check
 ## 项目结构
 
 ```text
-auto_qr_scanner/
+src/
 ├── app.py              # App：组织监听、扫描、记录和界面流程
 ├── wechat.py           # WeChat：微信交互和群图片获取
 ├── message.py          # ImageMessage：图片来源和接收时间

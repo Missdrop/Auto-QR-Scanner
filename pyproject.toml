@@ -18,4 +18,4 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.pyrefly]
-project-includes = ["auto_qr_scanner"]
+project-includes = ["src"]

@@ -1,7 +1,7 @@
-from auto_qr_scanner.history import History
-from auto_qr_scanner.scanner import Scanner
-from auto_qr_scanner.wechat import WeChat
-from auto_qr_scanner.window import Window
+from .history import History
+from .scanner import Scanner
+from .wechat import WeChat
+from .window import Window
 
 
 class App:
