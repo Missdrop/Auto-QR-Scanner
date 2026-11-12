@@ -1,6 +1,6 @@
 import struct
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from src.qt_access import QtAccess
 
@@ -32,6 +32,32 @@ def image(writable: bool = True) -> bytes:
 
 
 class QtAccessTest(unittest.TestCase):
+    def test_original_download_restores_a_hidden_main_window(self) -> None:
+        access = QtAccess()
+        with (
+            patch.object(access, "_window", return_value=(123, 456)) as find,
+            patch.object(access, "has_tree", return_value=True),
+            patch(
+                "src.qt_access.win32gui.IsWindowVisible",
+                side_effect=[False, True, True],
+            ),
+            patch("src.qt_access.win32gui.ShowWindow") as show,
+        ):
+            access.enable(lambda message: None, restore=True)
+            find.assert_called_once_with(include_hidden=True)
+            show.assert_called_once_with(123, 9)
+
+    def test_background_access_does_not_restore_a_window(self) -> None:
+        access = QtAccess()
+        with (
+            patch.object(access, "_window", return_value=(123, 456)) as find,
+            patch.object(access, "has_tree", return_value=True),
+            patch("src.qt_access.win32gui.ShowWindow") as show,
+        ):
+            access.enable(lambda message: None)
+            find.assert_called_once_with(include_hidden=False)
+            show.assert_not_called()
+
     def test_finds_only_a_writable_accessibility_flag(self) -> None:
         self.assertEqual(QtAccess.candidates(image()), [0x3000])
         self.assertEqual(QtAccess.candidates(image(False)), [])
