@@ -5,7 +5,7 @@ from queue import Empty, Queue
 from threading import Event, Thread
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from playwright.sync_api import BrowserContext, Page, Response, sync_playwright
+from playwright.sync_api import BrowserContext, Error, Page, Response, sync_playwright
 
 HOME_URL = "https://ams.xjtlu.edu.cn/studenth5/"
 
@@ -39,7 +39,10 @@ class Student:
 
     @staticmethod
     def is_student_url(url: str) -> bool:
-        parts = urlsplit(url)
+        try:
+            parts = urlsplit(url)
+        except ValueError:
+            return False
         return (
             parts.scheme == "https"
             and parts.netloc == "ams.xjtlu.edu.cn"
@@ -72,10 +75,10 @@ class Student:
                 self._page = self._context.pages[0]
                 self._page.on("response", self._on_response)
                 self._process_commands()
-        except Exception:
+        except Exception as exception:
             # Browser closure and missing Edge are recoverable through Login.
             self._notify(
-                "Student browser unavailable. "
+                f"Student browser unavailable ({type(exception).__name__}). "
                 "Close its window and try Student login again."
             )
         finally:
@@ -105,7 +108,12 @@ class Student:
 
             if url is None:
                 return
-            self._navigate(url)
+            try:
+                self._navigate(url)
+            except Error:
+                self._notify(
+                    "Browser navigation incomplete; finish login in the open browser"
+                )
 
     def _capture_session(self) -> dict[str, object] | None:
         if self._page is None:
@@ -113,20 +121,29 @@ class Student:
         if urlsplit(self._page.url).hostname != "ams.xjtlu.edu.cn":
             return None
 
-        raw = self._page.evaluate("sessionStorage.getItem('amsuserInfo')")
+        try:
+            raw = self._page.evaluate("sessionStorage.getItem('amsuserInfo')")
+        except Error:
+            # SSO redirects replace the JavaScript context during login.
+            return None
         if not raw:
             return None
         try:
             student = json.loads(raw)
         except (TypeError, ValueError):
             return None
+        if not isinstance(student, dict):
+            return None
         if not student.get("token") or not student.get("userId"):
             return None
 
-        self._page.evaluate(
-            "value => localStorage.setItem('autoQrStudentSession', value)",
-            raw,
-        )
+        try:
+            self._page.evaluate(
+                "value => localStorage.setItem('autoQrStudentSession', value)",
+                raw,
+            )
+        except Error:
+            return None
         if not self._session_present:
             self._session_present = True
             self._notify("Student session available; platform validates it on use")
@@ -135,26 +152,34 @@ class Student:
     def _navigate(self, url: str) -> None:
         if self._page is None:
             return
+
+        if url == HOME_URL:
+            # Repeated Login clicks must not interrupt an active SSO form.
+            origin = urlsplit(self._page.url).hostname
+            if origin in {None, "ams.xjtlu.edu.cn"}:
+                self._page.goto(HOME_URL, wait_until="domcontentloaded", timeout=30000)
+            self._page.bring_to_front()
+            if self._capture_session() is None:
+                self._notify("Login required: complete student login in the browser")
+            return
+
         if self._page.url == "about:blank":
             self._page.goto(HOME_URL, wait_until="domcontentloaded", timeout=30000)
-
         student = self._capture_session()
-        if url != HOME_URL and student is None:
+        if student is None:
             self._notify(
-                "Login required: sign in with your student account, then Retry"
+                "Login required: sign in, then select Open with student account"
             )
             self._page.bring_to_front()
             return
 
-        # AMS accepts the current user and token on its published QR route.
-        if student is not None and url != HOME_URL:
-            url = self._authenticated_url(url, student)
-        self._page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        # Changing only a Vue hash query may not mount the QR route again.
+        # A new document restores the same account through the init script.
+        authenticated_url = self._authenticated_url(url, student)
+        self._notify("Student session available; waiting for platform validation")
+        self._page.goto("about:blank", wait_until="domcontentloaded")
+        self._page.goto(authenticated_url, wait_until="domcontentloaded", timeout=30000)
         self._page.bring_to_front()
-        if student is None:
-            self._notify("Login required: complete student login in the browser")
-        else:
-            self._notify("Student session available; waiting for platform validation")
 
     @staticmethod
     def _authenticated_url(url: str, student: dict[str, object]) -> str:
@@ -178,7 +203,13 @@ class Student:
         if not isinstance(payload, dict):
             return
 
-        if payload.get("code") == 401:
+        details = payload.get("data")
+        login_failed = (
+            isinstance(details, dict)
+            and isinstance(details.get("loginInfo"), dict)
+            and details["loginInfo"].get("code") != 0
+        )
+        if payload.get("code") == 401 or login_failed:
             if self._page is not None:
                 self._page.evaluate("""
                     localStorage.removeItem('autoQrStudentSession');
@@ -188,7 +219,6 @@ class Student:
             self._notify("Login required: student session expired")
             return
 
-        details = payload.get("data")
         if isinstance(details, dict) and isinstance(details.get("checkInfo"), dict):
             check = details["checkInfo"]
             if check.get("code") == 0:
