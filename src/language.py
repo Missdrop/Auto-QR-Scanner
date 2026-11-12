@@ -8,6 +8,9 @@ def chinese(message: str) -> str:
             "当前为低分辨率图片，正在等待更清晰的缓存版本"
         ),
         "Ready": "就绪",
+        "Invalid address filter": (
+            "地址过滤格式无效，请每行填写一个域名或完整 HTTP/HTTPS 网址前缀"
+        ),
         "Selected image versions are not cached; open the image in WeChat and retry": (
             "部分已选图片版本未取得，请在微信中打开该图片后重试"
         ),
@@ -23,6 +26,9 @@ def chinese(message: str) -> str:
         "No QR code": "未识别到二维码",
         "Failed": "识别失败",
         "Monitoring stopped": "监听已停止",
+        "Monitoring stopped: Background process exited unexpectedly": (
+            "后台读取进程异常退出，请检查微信状态后重新开始监听"
+        ),
         "Monitoring selected chats in the background": "正在后台监听所选会话",
         "Preparing background database access; WeChat can stay minimized": (
             "正在准备后台读取，微信可保持最小化"
