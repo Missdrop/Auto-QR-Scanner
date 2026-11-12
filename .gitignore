@@ -14,3 +14,5 @@ logs/
 *.log
 Thumbs.db
 .DS_Store
+.ruff_cache/
+.pytest_cache/
