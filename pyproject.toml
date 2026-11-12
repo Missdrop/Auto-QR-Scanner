@@ -3,6 +3,8 @@ name = "auto-qr-scanner"
 version = "0.1.0"
 requires-python = ">=3.12,<3.13"
 readme = "README.md"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
 dependencies = [
     "dfindexeddb==20260210",
     "numpy>=2.2,<3",
