@@ -51,3 +51,18 @@ async function synchronize() {
 
 setInterval(synchronize, 2000);
 synchronize();
+
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+    if (message.type !== "inspect-session") return false;
+    let desktop = null;
+    try { desktop = JSON.parse(localStorage.getItem("userInfo") || "null"); } catch {}
+    const session = readSession();
+    respond({
+        ok: true,
+        sessionDetected: !!session,
+        hasDesktopToken: !!localStorage.getItem("Token"),
+        desktopFields: desktop && typeof desktop === "object" ? Object.keys(desktop) : [],
+    });
+    synchronize();
+    return false;
+});
