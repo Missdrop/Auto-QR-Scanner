@@ -32,6 +32,7 @@ class Window(QMainWindow):
     """
 
     start_requested = Signal(list)
+    latest_requested = Signal(list)
     stop_requested = Signal()
     files_requested = Signal(list)
     retry_requested = Signal(object)
@@ -53,7 +54,7 @@ class Window(QMainWindow):
         self._groups.setPlaceholderText("Exact WeChat group names, one per line")
         self._groups.setPlainText(str(self._settings.value("groups", "")))
         self._groups.setMaximumHeight(100)
-        self._automatic = QCheckBox("Open new AMS codes in student session")
+        self._automatic = QCheckBox("Process new AMS codes in student session")
         self._automatic.setChecked(True)
         self._status = QLabel("Ready")
         self._student_status = QLabel("Student login required")
@@ -80,11 +81,16 @@ class Window(QMainWindow):
     def _create_layout(self) -> QWidget:
         widget = QWidget()
         layout = QVBoxLayout(widget)
-        layout.addWidget(QLabel("WeChat groups"))
+        layout.addWidget(QLabel("WeChat conversations"))
         layout.addWidget(self._groups)
 
         controls = QHBoxLayout()
         self._start = self._button("Start monitoring", self._request_start, controls)
+        self._latest = self._button(
+            "Scan latest chat image",
+            lambda: self.latest_requested.emit(self._groups.toPlainText().splitlines()),
+            controls,
+        )
         self._stop = self._button("Stop", self.stop_requested.emit, controls)
         self._stop.setEnabled(False)
         self._button("Scan images", self._select_images, controls)
@@ -103,7 +109,7 @@ class Window(QMainWindow):
         actions = QHBoxLayout()
         self._button("Copy content", self._copy_content, actions)
         self._button("Open link", self._open_link, actions)
-        self._button("Open with student account", self._open_student, actions)
+        self._button("Process with student account", self._open_student, actions)
         self._button("Retry image", self._retry, actions)
         layout.addLayout(actions)
         layout.addWidget(self._status)
@@ -150,6 +156,7 @@ class Window(QMainWindow):
 
     def set_monitoring(self, running: bool) -> None:
         self._start.setEnabled(not running)
+        self._latest.setEnabled(not running)
         self._stop.setEnabled(running)
         self._groups.setEnabled(not running)
 

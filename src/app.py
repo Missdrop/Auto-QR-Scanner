@@ -25,6 +25,7 @@ class App(QObject):
     notice = Signal(str)
     student_notice = Signal(str)
     incoming = Signal(object)
+    latest_incoming = Signal(object)
 
     def __init__(
         self,
@@ -59,7 +60,9 @@ class App(QObject):
         self.notice.connect(self._show_notice)
         self.student_notice.connect(self._window.show_student_status)
         self.incoming.connect(self._submit_incoming)
+        self.latest_incoming.connect(self._worker.submit)
         self._window.start_requested.connect(self._start_monitoring)
+        self._window.latest_requested.connect(self._scan_latest)
         self._window.stop_requested.connect(self._wechat.stop)
         self._window.files_requested.connect(self._scan_files)
         self._window.retry_requested.connect(self._worker.submit)
@@ -79,6 +82,15 @@ class App(QObject):
         self._window.show_status(message)
         if message.startswith("Monitoring stopped"):
             self._window.set_monitoring(False)
+
+    def _scan_latest(self, groups: list[str]) -> None:
+        try:
+            self._wechat.start(
+                groups, self.latest_incoming.emit, self.notice.emit, latest_only=True
+            )
+            self._window.set_monitoring(True)
+        except ValueError as exception:
+            self.notice.emit(str(exception))
 
     def _scan_files(self, paths: list[Path]) -> None:
         for path in paths:

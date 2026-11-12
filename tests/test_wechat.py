@@ -61,11 +61,18 @@ class WeChatTest(unittest.TestCase):
         client = Mock()
         client.ChatInfo.return_value = {"chat_name": "Group", "chat_type": "group"}
         old = self.message("old")
-        client.GetAllMessage.return_value = [old]
+        reader = Mock()
+        reader.name.return_value = "Group"
+        reader.messages.return_value = [old]
         self.wechat._stop.set()
-        self.wechat._poll(client, ["Group"], self.received.append, self.notices.append)
+        with patch("src.passive_chat.PassiveChat", return_value=reader):
+            self.wechat._poll(
+                client, ["Group"], self.received.append, self.notices.append
+            )
         self.assertIn("Group:old", self.wechat._seen)
         self.assertEqual(self.received, [])
+        client.GetAllMessage.assert_not_called()
+        client.ChatInfo.assert_not_called()
 
     def test_free_backend_polls_even_when_listener_api_exists(self) -> None:
         module = Mock()
@@ -93,6 +100,68 @@ class WeChatTest(unittest.TestCase):
         listen.assert_not_called()
         client.StopListening.assert_called_once()
         self.assertEqual(events, ["restored", "uninitialized"])
+
+    def test_passive_poll_receives_new_images_without_backend_parsing(self) -> None:
+        source = self.root / "incoming.png"
+        source.write_bytes(b"photo")
+        old = self.message("old")
+        new = self.message("new")
+        new.download.return_value = source
+        reader = Mock()
+        reader.name.return_value = "Group"
+        reader.is_foreground.return_value = True
+        reader.messages.side_effect = [[old], [old, new]]
+        client = Mock()
+        with (
+            patch("src.passive_chat.PassiveChat", return_value=reader),
+            patch.object(self.wechat._stop, "wait", side_effect=[False, True]),
+        ):
+            self.wechat._poll(
+                client, ["Group"], self.received.append, self.notices.append
+            )
+        self.assertEqual([message.message_id for message in self.received], ["new"])
+        old.download.assert_not_called()
+        client.GetAllMessage.assert_not_called()
+        client.ChatInfo.assert_not_called()
+
+    def test_passive_poll_does_not_capture_when_wechat_is_covered(self) -> None:
+        reader = Mock()
+        reader.name.return_value = "Group"
+        reader.is_foreground.return_value = False
+        reader.messages.return_value = []
+        with (
+            patch("src.passive_chat.PassiveChat", return_value=reader),
+            patch.object(self.wechat._stop, "wait", side_effect=[False, True]),
+        ):
+            self.wechat._poll(
+                Mock(), ["Group"], self.received.append, self.notices.append
+            )
+        reader.messages.assert_called_once()
+        self.assertEqual(self.received, [])
+        self.assertIn("paused", self.notices[-1])
+
+    def test_latest_image_mode_reads_one_old_incoming_image(self) -> None:
+        source = self.root / "latest.png"
+        source.write_bytes(b"photo")
+        older = self.message("older")
+        latest = self.message("latest")
+        latest.download.return_value = source
+        outgoing = self.message("outgoing", "self")
+        reader = Mock()
+        reader.name.return_value = "Chat"
+        reader.is_foreground.return_value = True
+        reader.messages.return_value = [older, latest, outgoing]
+        with patch("src.passive_chat.PassiveChat", return_value=reader):
+            self.wechat._poll(
+                Mock(),
+                ["Chat"],
+                self.received.append,
+                self.notices.append,
+                latest_only=True,
+            )
+        self.assertEqual([message.message_id for message in self.received], ["latest"])
+        older.download.assert_not_called()
+        outgoing.download.assert_not_called()
 
     def test_failed_initialization_restores_accessibility(self) -> None:
         module = Mock()
