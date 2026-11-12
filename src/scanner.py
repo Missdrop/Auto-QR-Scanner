@@ -1,4 +1,4 @@
-from auto_qr_scanner.image_processor import ImageProcessor
+from .image_processor import ImageProcessor
 
 
 class Scanner:
