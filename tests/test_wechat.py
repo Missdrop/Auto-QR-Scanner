@@ -91,7 +91,7 @@ class WeChatTest(unittest.TestCase):
             patch.object(self.wechat, "_poll") as poll,
             patch.object(self.wechat, "_listen") as listen,
         ):
-            self.wechat._run(["Group"], self.received.append, self.notices.append)
+            self.wechat._run_ui(["Group"], self.received.append, self.notices.append)
 
         module.WeChat.assert_called_once_with(
             resize=False, ads=False, start_listener=False
@@ -172,7 +172,7 @@ class WeChatTest(unittest.TestCase):
             patch("src.wechat.importlib.import_module"),
             patch.object(self.wechat, "_load_backend", return_value=module),
         ):
-            self.wechat._run(["Group"], self.received.append, self.notices.append)
+            self.wechat._run_ui(["Group"], self.received.append, self.notices.append)
 
         access.close.assert_called_once()
         self.assertIn("Window unavailable", self.notices[-1])
@@ -183,3 +183,16 @@ class WeChatTest(unittest.TestCase):
         self.wechat.close()
         self.assertTrue(self.wechat._stop.is_set())
         thread.join.assert_called_once_with()
+
+    def test_background_stop_can_terminate_a_slow_database_startup(self) -> None:
+        context = Mock()
+        process = context.Process.return_value
+        process.pid = 123
+        process.is_alive.return_value = True
+        self.wechat._stop.set()
+        with patch("src.wechat.multiprocessing.get_context", return_value=context):
+            self.wechat._run(["Chat"], self.received.append, self.notices.append)
+        process.terminate.assert_called_once()
+        context.Event.return_value.set.assert_called_once()
+        context.Queue.return_value.close.assert_called_once()
+        self.assertEqual(self.notices[-1], "Monitoring stopped")

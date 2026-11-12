@@ -1,8 +1,10 @@
 import importlib
+import multiprocessing
 import shutil
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from queue import Empty
 from threading import Event, Thread
 from typing import Any
 from uuid import uuid4
@@ -12,10 +14,7 @@ from .message import ImageMessage
 
 class WeChat:
     """
-    Keep UI Automation on its own thread and emit only new incoming images.
-
-    Free wxauto4 monitors one group by polling. A separately installed wxautox4
-    backend can use its multi-window listener. Client compatibility is required.
+    Isolate database access in a cancellable process and emit incoming images.
     """
 
     def __init__(self, image_directory: Path) -> None:
@@ -60,6 +59,56 @@ class WeChat:
         return self._thread is not None and self._thread.is_alive()
 
     def _run(
+        self,
+        names: list[str],
+        receive: Callable[[ImageMessage], None],
+        notify: Callable[[str], None],
+        latest_only: bool = False,
+    ) -> None:
+        from .database_reader import read_database
+
+        context = multiprocessing.get_context("spawn")
+        output = context.Queue(maxsize=128)
+        stopped = context.Event()
+        process = context.Process(
+            target=read_database,
+            args=(names, self._image_directory, latest_only, output, stopped),
+            name="wechat-database",
+            daemon=True,
+        )
+        stopped_message = "Monitoring stopped"
+        try:
+            process.start()
+            while not self._stop.is_set():
+                try:
+                    event, value = output.get(timeout=0.2)
+                except Empty:
+                    if not process.is_alive():
+                        break
+                    continue
+                if event == "image":
+                    receive(value)
+                elif event == "error":
+                    stopped_message = "Monitoring stopped: " + value
+                elif event == "notice":
+                    notify(value)
+                elif event == "finished":
+                    break
+        except Exception as exception:
+            stopped_message = f"Monitoring stopped: {type(exception).__name__}"
+        finally:
+            stopped.set()
+            if process.pid is not None:
+                process.join(timeout=1)
+                if process.is_alive():
+                    process.terminate()
+                    process.join(timeout=2)
+                process.close()
+            output.close()
+            output.cancel_join_thread()
+            notify(stopped_message)
+
+    def _run_ui(
         self,
         names: list[str],
         receive: Callable[[ImageMessage], None],

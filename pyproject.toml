@@ -5,14 +5,16 @@ requires-python = ">=3.12,<3.13"
 readme = "README.md"
 dependencies = [
     "numpy>=2.2,<3",
-    "opencv-python-headless>=4.11,<5",
+    "opencv-python>=4.11,<5",
     "pyside6-essentials>=6.8,<6.9",
+    "pywebview>=6,<7",
     "zxing-cpp>=3.1.1",
 ]
 
 [project.optional-dependencies]
 wechat = [
     "uiautomation>=2.0 ; sys_platform == 'win32'",
+    "wechatauto-replica==1.2.10",
     "wxauto4>=41.1.7 ; sys_platform == 'win32'",
 ]
 
