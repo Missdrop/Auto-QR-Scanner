@@ -9,6 +9,37 @@ from time import monotonic
 from typing import Any
 
 
+class DownloadDiagnostics(logging.Handler):
+    """Keep only a failure category, without retaining private backend messages."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.code = 1
+
+    def emit(self, record: logging.LogRecord) -> None:
+        template = str(record.msg)
+        if "消息列表没渲染" in template or "可视区里没有图片气泡" in template:
+            self.code = 3
+        elif "没有出现新的预览窗" in template:
+            self.code = 4
+        elif "预览窗缩放键状态" in template or "那一档仍没出现" in template:
+            self.code = 5
+        elif "原图流程异常" in template:
+            self.code = 6
+
+
+def failure_notice(code: int | None) -> str:
+    """Translate child process results into stable, non-sensitive notices."""
+    return {
+        2: "Original download failed: WeChat controls unavailable",
+        3: "Original download failed: image message not visible",
+        4: "Original download failed: image viewer did not open",
+        5: "Original download failed: original file not received",
+        6: "Original download failed: backend error",
+        7: "Original download failed: timed out",
+    }.get(code or 1, "Original download unavailable; open the image in WeChat")
+
+
 def download_original(
     directory: Path, images: Path, name: str, user: str, row: dict
 ) -> None:
@@ -28,18 +59,31 @@ def download_original(
 
         pythoncom.CoInitialize()
         access = QtAccess()
+        diagnostics = DownloadDiagnostics()
+        logger = logging.getLogger("wechatauto")
         try:
             source = DatabaseSource(directory, images)
+            # Cached originals need neither focus nor accessibility compatibility.
             try:
-                access.enable(lambda message: None)
-            except ValueError:
-                # An original already on disk needs no visible main window.
+                source.image(user, row, "original")
+                return
+            except FileNotFoundError:
                 pass
+            try:
+                access.enable(lambda message: None, restore=True)
+            except ValueError:
+                raise SystemExit(2) from None
+            logger.handlers = [diagnostics]
+            logger.propagate = False
+            logger.setLevel(logging.DEBUG)
+            logging.disable(logging.NOTSET)
             if source.original(user, row, name) is None:
-                raise SystemExit(1)
+                raise SystemExit(diagnostics.code)
         except Exception:
-            raise SystemExit(1) from None
+            raise SystemExit(6) from None
         finally:
+            logging.disable(logging.CRITICAL)
+            logger.removeHandler(diagnostics)
             access.close()
             pythoncom.CoUninitialize()
 
@@ -87,9 +131,11 @@ class OriginalDownloads:
         if self._process is not None:
             if self._process.is_alive() and monotonic() < self._deadline:
                 return
-            self.last_success = self._process.exitcode == 0
+            timed_out = self._process.is_alive()
+            self.last_success = not timed_out and self._process.exitcode == 0
             if not self.last_success:
-                self._notify("Original download unavailable; open the image in WeChat")
+                code = 7 if timed_out else self._process.exitcode
+                self._notify(failure_notice(code))
             self._finish()
         if self._pending:
             identifier, name, user, row = self._pending.popleft()
