@@ -8,6 +8,9 @@ def chinese(message: str) -> str:
             "当前为低分辨率图片，正在等待更清晰的缓存版本"
         ),
         "Ready": "就绪",
+        "Selected image versions are not cached; open the image in WeChat and retry": (
+            "部分已选图片版本未取得，请在微信中打开该图片后重试"
+        ),
         "Select at least one valid image source": "请至少勾选一种图片来源",
         "Conversation suggestions unavailable; enter a name manually": (
             "后台候选读取失败，仍可手动填写精确会话名称"

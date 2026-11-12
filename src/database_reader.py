@@ -49,6 +49,11 @@ class DatabaseReader:
             photo.id + ":" + mode in self._versions for mode in self._image_modes
         )
 
+    def _forget(self, photo: DatabasePhoto) -> None:
+        self._versions.pop(photo.id, None)
+        for mode in self._image_modes or []:
+            self._versions.pop(photo.id + ":" + mode, None)
+
     def _deliver_source(
         self, name: str, photo: DatabasePhoto, source: Path, key: str
     ) -> None:
@@ -56,7 +61,6 @@ class DatabaseReader:
             digest = hashlib.file_digest(stream, "sha256").hexdigest()
         if self._versions.get(key) == digest:
             return
-        self._versions[key] = digest
         self._images.mkdir(parents=True, exist_ok=True)
         destination = self._images / (uuid4().hex + source.suffix)
         shutil.copyfile(source, destination)
@@ -69,6 +73,8 @@ class DatabaseReader:
             kind if isinstance(kind, str) else "unknown",
         )
         self._output.put(("image", message))
+        # A failed copy or delivery must remain eligible for retry.
+        self._versions[key] = digest
 
     def run(self, names: list[str], latest_only: bool) -> None:
         self.notice("Preparing background database access; WeChat can stay minimized")
@@ -80,6 +86,7 @@ class DatabaseReader:
         users = {name: source.resolve(name) for name in names}
         sequences = {}
         pending: dict[str, tuple[str, DatabasePhoto, float]] = {}
+        originals: dict[str, Path] = {}
         for name, user in users.items():
             rows = source.latest(user, 100 if latest_only else 1)
             sequences[user] = max(
@@ -107,6 +114,9 @@ class DatabaseReader:
         while not self._stopped.wait(0.3):
             if self._downloads is not None:
                 self._downloads.poll()
+                for identifier, path in self._downloads.take_completed():
+                    if any(photo.id == identifier for _, photo, _ in pending.values()):
+                        originals[identifier] = path
             for name, user in [] if latest_only else users.items():
                 for photo in source.after(user, sequences[user]):
                     sequences[user] = max(sequences[user], int(photo.row["sort_seq"]))
@@ -123,6 +133,14 @@ class DatabaseReader:
                 if self._stopped.is_set():
                     return
                 try:
+                    if photo.id in originals:
+                        photo.image_kind = "original"
+                        version = (
+                            photo.id + ":original"
+                            if self._image_modes is not None
+                            else photo.id
+                        )
+                        self._deliver_source(name, photo, originals[photo.id], version)
                     self.deliver(name, photo)
                 except FileNotFoundError:
                     if monotonic() < deadline:
@@ -133,11 +151,19 @@ class DatabaseReader:
                         f"Cannot decrypt cached image: {type(exception).__name__}"
                     )
                 if self._complete(photo):
+                    originals.pop(photo.id, None)
+                    self._forget(photo)
                     del pending[key]
                     continue
                 if monotonic() < deadline:
                     continue
-                self._versions.pop(photo.id, None)
+                if self._image_modes is not None:
+                    self.notice(
+                        "Selected image versions are not cached; "
+                        "open the image in WeChat and retry"
+                    )
+                self._forget(photo)
+                originals.pop(photo.id, None)
                 del pending[key]
             if latest_only and not pending:
                 return
