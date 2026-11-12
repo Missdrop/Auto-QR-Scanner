@@ -74,7 +74,9 @@ class App(QObject):
 
     def _open_image_folder(self) -> None:
         self._image_directory.mkdir(parents=True, exist_ok=True)
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._image_directory.resolve())))
+        QDesktopServices.openUrl(
+            QUrl.fromLocalFile(str(self._image_directory.resolve()))
+        )
 
     def _start_monitoring(self, groups: list[str]) -> None:
         try:
