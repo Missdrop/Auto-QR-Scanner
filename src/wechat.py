@@ -104,6 +104,11 @@ class WeChat:
                     event, value = output.get(timeout=0.2)
                 except Empty:
                     if not process.is_alive():
+                        if process.exitcode not in {None, 0}:
+                            stopped_message = (
+                                "Monitoring stopped: "
+                                "Background process exited unexpectedly"
+                            )
                         break
                     continue
                 if event == "image":

@@ -1,11 +1,41 @@
 import sqlite3
 import unittest
-from unittest.mock import Mock
+from pathlib import Path
+from unittest.mock import Mock, patch
 
-from src.conversation_search import contact_candidates
+from PySide6.QtWidgets import QApplication
+
+from src.conversation_search import ConversationSearch, contact_candidates
 
 
 class ConversationSearchTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.application = QApplication.instance() or QApplication([])
+
+    def test_crashed_lookup_reports_failure_and_next_query_restarts_it(self):
+        search = ConversationSearch(Path("unused"))
+        old = Mock()
+        old.is_alive.return_value = False
+        search._process = old
+        search._requests, search._results = Mock(), Mock()
+        failures = []
+        search.failed.connect(failures.append)
+        search._receive()
+        self.assertEqual(len(failures), 1)
+        old.terminate.assert_not_called()
+        old.close.assert_called_once()
+        context = Mock()
+        try:
+            with patch(
+                "src.conversation_search.multiprocessing.get_context",
+                return_value=context,
+            ):
+                search.request("24")
+            context.Process.return_value.start.assert_called_once()
+        finally:
+            search.close()
+
     def setUp(self) -> None:
         self.connection = sqlite3.connect(":memory:")
         self.connection.row_factory = sqlite3.Row

@@ -1,12 +1,24 @@
 import tempfile
 import unittest
 from pathlib import Path
+from queue import Empty
 from unittest.mock import Mock, patch
 
 from src.wechat import WeChat
 
 
 class WeChatTest(unittest.TestCase):
+    def test_background_crash_is_not_reported_as_a_normal_stop(self):
+        context = Mock()
+        process = context.Process.return_value
+        process.pid = 123
+        process.is_alive.return_value = False
+        process.exitcode = 1
+        context.Queue.return_value.get.side_effect = Empty
+        with patch("src.wechat.multiprocessing.get_context", return_value=context):
+            self.wechat._run(["Chat"], self.received.append, self.notices.append)
+        self.assertIn("exited unexpectedly", self.notices[-1])
+
     def setUp(self) -> None:
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
