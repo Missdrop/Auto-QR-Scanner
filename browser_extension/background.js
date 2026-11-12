@@ -14,6 +14,11 @@ async function deliver(event) {
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
     const handle = async () => {
+        if (message.type === "inspect" && !sender.tab) {
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (!tabs[0]?.id) throw new Error("Open the AMS tab first.");
+            return chrome.tabs.sendMessage(tabs[0].id, { type: "inspect-session" });
+        }
         if (message.type === "pair" && !sender.tab) {
             if (!/^\d{1,5}:[A-Za-z0-9_-]{32,64}$/.test(message.code)) {
                 throw new Error("Invalid pairing code.");

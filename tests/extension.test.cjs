@@ -12,7 +12,7 @@ function createPage() {
         localStorage: { getItem: () => null },
         location: { hash: "#/home" },
         setInterval: () => {},
-        chrome: { runtime: { sendMessage: async message => {
+        chrome: { runtime: { onMessage: { addListener: () => {} }, sendMessage: async message => {
             events.push(message.payload);
             return { ok: true };
         } } },
