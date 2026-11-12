@@ -48,14 +48,6 @@ class App(QObject):
         self._worker = Worker(scanner, history, self.completed.emit, self.notice.emit)
         self._connect_actions()
         window.show_student_status(self._student.status())
-        try:
-            # Keep logout notifications working after a desktop restart.
-            self._student.start()
-        except OSError:
-            window.show_student_status(
-                "Cannot start the local bridge; close other app instances"
-            )
-
         for outcome in history.outcomes():
             window.show_outcome(outcome)
 
@@ -129,7 +121,7 @@ class App(QObject):
         self._window.show_status(f"{result.status()}: {result.message.image_path.name}")
         if automatic:
             for code in result.codes:
-                if Student.is_student_url(code.text):
+                if Student.is_web_url(code.text):
                     previous = self._history.outcome(code.text)
                     if previous is None or previous.status in {
                         "error",

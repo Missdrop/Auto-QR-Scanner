@@ -40,6 +40,53 @@ class StudentPageTest(unittest.TestCase):
     "Enable QR_BROWSER_TESTS for real Chromium tests",
 )
 class ChromiumRequestTest(unittest.TestCase):
+    def test_profile_keeps_cookie_and_token_after_browser_restart(self):
+        with tempfile.TemporaryDirectory() as directory, sync_playwright() as runtime:
+            for first in (True, False):
+                context = runtime.chromium.launch_persistent_context(
+                    directory,
+                    executable_path=Chromium().executable(),
+                    headless=True,
+                )
+                try:
+                    context.route(
+                        "**/*",
+                        lambda route: route.fulfill(
+                            content_type="text/html",
+                            body="<title>Profile fixture</title>",
+                        ),
+                    )
+                    page = context.pages[0]
+                    page.goto("https://example.test/")
+                    if first:
+                        page.evaluate("localStorage.setItem('Token', 'fixture-token')")
+                        context.add_cookies(
+                            [
+                                {
+                                    "name": "fixture",
+                                    "value": "saved",
+                                    "domain": "example.test",
+                                    "path": "/",
+                                    "secure": True,
+                                    "expires": 4102444800,
+                                }
+                            ]
+                        )
+                    else:
+                        self.assertTrue(
+                            page.evaluate(
+                                "localStorage.getItem('Token') === 'fixture-token'"
+                            )
+                        )
+                        self.assertTrue(
+                            any(
+                                cookie["name"] == "fixture"
+                                for cookie in context.cookies()
+                            )
+                        )
+                finally:
+                    context.close()
+
     def test_browser_requests_and_results_without_real_school_traffic(self):
         with tempfile.TemporaryDirectory() as directory, sync_playwright() as runtime:
             browser = runtime.chromium.launch(executable_path=Chromium().executable())

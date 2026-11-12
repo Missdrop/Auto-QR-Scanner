@@ -1,8 +1,8 @@
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, Qt, QUrl, Signal
-from PySide6.QtGui import QCloseEvent, QDesktopServices
+from PySide6.QtCore import QSettings, Qt, Signal
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -61,7 +61,7 @@ class Window(QMainWindow):
         self._originals = QCheckBox("同时下载原图（会短暂打开微信图片窗口）")
         self._originals.setChecked(True)
         self._status = QLabel("就绪")
-        self._student_status = QLabel("请先登录账号")
+        self._student_status = QLabel("浏览器资料保存在本机")
         self._student_status.setWordWrap(True)
         self._table = self._create_table()
         self._details = QPlainTextEdit()
@@ -110,7 +110,7 @@ class Window(QMainWindow):
         self._stop.setEnabled(False)
         self._button("仅识别本地图片", self._select_images, controls)
         self._button("仅识别图片文件夹", self._select_folder, controls)
-        self._button("账号登录", self.login_requested.emit, controls)
+        self._button("打开内置浏览器", self.login_requested.emit, controls)
         layout.addLayout(controls)
         layout.addWidget(self._automatic)
         layout.addWidget(self._originals)
@@ -124,7 +124,7 @@ class Window(QMainWindow):
         actions = QHBoxLayout()
         self._button("复制内容", self._copy_content, actions)
         self._button("打开链接", self._open_link, actions)
-        self._button("使用当前账号扫码", self._open_student, actions)
+        self._button("在内置浏览器扫码", self._open_student, actions)
         self._button("重新识别并处理", self._retry, actions)
         layout.addLayout(actions)
         layout.addWidget(self._status)
@@ -247,9 +247,7 @@ class Window(QMainWindow):
         selected = self._selection()
         if selected is None:
             return
-        url = QUrl(selected[1])
-        if url.isValid() and url.scheme() in {"http", "https"}:
-            QDesktopServices.openUrl(url)
+        self.student_open_requested.emit(selected[1])
 
     def _open_student(self) -> None:
         selected = self._selection()

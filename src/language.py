@@ -8,6 +8,12 @@ def chinese(message: str) -> str:
             "当前为低分辨率图片，正在等待更清晰的缓存版本"
         ),
         "Ready": "就绪",
+        "Browser profile saved; sign in on any site inside the browser": (
+            "浏览器资料保存在本机，可打开内置浏览器访问网站并登录"
+        ),
+        "Close the built-in browser before background processing": (
+            "请先关闭内置浏览器窗口，再重试后台扫码；登录状态会保留"
+        ),
         "Original download unavailable; open the image in WeChat": (
             "原图下载失败，请在电脑微信中打开该图片；缩略图识别不受影响"
         ),
@@ -38,7 +44,7 @@ def chinese(message: str) -> str:
             "请先关闭账号登录窗口，再重试扫码"
         ),
         "Login required: open Student login and sign in": (
-            "请点击“账号登录”完成登录后重试"
+            "请打开内置浏览器，在对应网站登录后重试"
         ),
         "Login required: student session expired or was cleared": (
             "账号登录已过期，请重新登录"
@@ -47,7 +53,7 @@ def chinese(message: str) -> str:
             "请先登录，然后重试待处理记录"
         ),
         "Close the student login window and reopen Student login": (
-            "请关闭登录窗口，再点击“账号登录”重试"
+            "请关闭内置浏览器窗口后重试"
         ),
         "Cannot start the local bridge; close other app instances": (
             "登录服务无法启动，请关闭其他程序实例"
@@ -56,7 +62,7 @@ def chinese(message: str) -> str:
             "扫码队列已满，请稍后手动重试这条记录"
         ),
         "Wait for the Chromium request before opening Student login": (
-            "请等待当前扫码完成，再打开账号登录"
+            "请等待当前扫码完成，再打开内置浏览器"
         ),
         "Image is not cached; open it once in WeChat and retry": (
             "微信尚未缓存图片，请手动打开图片后重试"

@@ -61,11 +61,13 @@ class StudentTest(unittest.TestCase):
         restored = Student(Path(self.directory.name), self.messages.append)
         self.assertEqual(restored._session, {})
 
-    def test_missing_login_does_not_open_a_code(self) -> None:
-        self.student.start(port=0)
-        with patch("src.student.Browser.open") as browser:
+    def test_browser_profile_is_authoritative_without_exported_session(self) -> None:
+        with patch.object(
+            self.student._browser, "process", return_value=(401, "Expired")
+        ) as browser:
             self.student.open(HOME_URL + "#/?state=example")
-            browser.assert_not_called()
+            self.student._request_thread.join(timeout=1)
+            browser.assert_called_once_with("example")
         self.assertIn("Login required", self.messages[-1])
 
     def test_only_exact_student_origin_is_accepted(self) -> None:
@@ -78,8 +80,25 @@ class StudentTest(unittest.TestCase):
             "javascript:alert(1)",
         ]:
             self.assertFalse(Student.is_student_url(url))
+        for url in (
+            "javascript:alert(1)",
+            "https://[",
+            "https://user@host/path",
+            "file:///x",
+        ):
             with self.assertRaises(ValueError):
                 self.student.open(url)
+
+    def test_generic_web_links_open_in_the_persistent_browser(self):
+        with patch.object(self.student._browser, "open", return_value=True) as browser:
+            self.student.open("https://example.com/qr")
+            browser.assert_called_once_with("https://example.com/qr")
+        self.assertIsNone(self.student._server)
+
+    def test_browser_button_opens_blank_page_without_a_login_workflow(self):
+        with patch.object(self.student._browser, "open", return_value=True) as browser:
+            self.student.open()
+            browser.assert_called_once_with("about:blank")
 
     def test_invalid_event_is_rejected(self) -> None:
         with self.assertRaises(HTTPError) as failure:

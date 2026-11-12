@@ -70,31 +70,26 @@ class Student:
         )
         self._thread.start()
 
-    def open(self, url: str = HOME_URL) -> None:
+    def open(self, url: str | None = None) -> None:
         if self._closed:
             raise ValueError("The student browser has been closed")
-        if not self.is_student_url(url):
-            raise ValueError("Only HTTPS XJTLU AMS student URLs can open automatically")
-        self.start()
-        if url == HOME_URL and self._processing.locked():
+        if url is not None and not self.is_web_url(url):
+            raise ValueError("Only HTTP or HTTPS links can open in the browser")
+        if self._processing.locked() and (url is None or not self.is_student_url(url)):
             self._notify("Wait for the Chromium request before opening Student login")
             return
         with self._lock:
             student = dict(self._session)
-        if url != HOME_URL and not student:
-            self._outcome(Outcome(url, "login"))
-            self._notify("Login required: open Student login and sign in")
-            return
 
-        if url != HOME_URL:
+        if url is not None and self.is_student_url(url) and url != HOME_URL:
             self._ams.state(url)
-            self._enqueue(url, student["token"])
+            self._enqueue(url, student.get("token", ""))
             return
-        self._notify(
-            "Sign in using Chromium, then close its window to synchronize the session"
-        )
-        if not self._browser.open(url):
+        self._notify("Browser profile saved; sign in on any site inside the browser")
+        if not self._browser.open(url or "about:blank"):
             self._notify("Cannot open the student page; check the installed browser")
+        elif url is not None:
+            self._outcome(Outcome(url, "opened"))
 
     def _enqueue(self, url: str, token: str) -> None:
         with self._queue_lock:
@@ -125,14 +120,8 @@ class Student:
                     self._processing.release()
                     return
                 url, token = self._pending.popleft()
-            with self._lock:
-                available = bool(self._session)
-            if available:
-                self._outcome(Outcome(url, "processing"))
-                self._process(url, token)
-            else:
-                self._outcome(Outcome(url, "login"))
-                self._notify("Login required; retry pending records after signing in")
+            self._outcome(Outcome(url, "processing"))
+            self._process(url, token)
 
     def _process(self, url: str, token: str) -> None:
         try:
@@ -140,9 +129,10 @@ class Student:
             self._outcome(Outcome(url, "result", code, message))
             if code == 401:
                 with self._lock:
-                    current = self._session.get("token") == token
+                    current = not self._session or self._session.get("token") == token
                     if current:
-                        self._store.save({})
+                        if self._session:
+                            self._store.save({})
                         self._session = {}
                 if current:
                     self._notify(
@@ -165,6 +155,19 @@ class Student:
                 f"Cannot obtain a platform result: {type(exception).__name__}. "
                 "Inspect the student login and retry manually."
             )
+
+    @staticmethod
+    def is_web_url(url: str) -> bool:
+        try:
+            parts = urlsplit(url)
+            return (
+                parts.scheme in {"http", "https"}
+                and bool(parts.hostname)
+                and parts.username is None
+                and parts.password is None
+            )
+        except ValueError:
+            return False
 
     @staticmethod
     def is_student_url(url: str) -> bool:
@@ -244,10 +247,7 @@ class Student:
         return Handler
 
     def status(self) -> str:
-        with self._lock:
-            if self._session:
-                return "Student session saved; platform validates it on use"
-        return "Student login required"
+        return "Browser profile saved; sign in on any site inside the browser"
 
     def close(self) -> None:
         self._closed = True
