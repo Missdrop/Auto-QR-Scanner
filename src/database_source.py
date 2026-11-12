@@ -42,7 +42,7 @@ class DatabaseSource:
         self.media = media.MediaDownloader(self.db, save_dir=str(images))
         self._keys = ImageKeys(directory / "image-key.bin")
         self.thumbnail_only = False
-        self.image_mode = "original"
+        self.image_mode = "compressed"
 
     def resolve(self, name: str) -> str:
         _, separator, identifier = name.rpartition(" [")
@@ -77,52 +77,24 @@ class DatabaseSource:
     def image(
         self, user: str, row: dict[str, Any], exact_mode: str | None = None
     ) -> Path:
-        thumbnail_only = getattr(self, "thumbnail_only", False)
-        mode = (
-            "thumbnail" if thumbnail_only else getattr(self, "image_mode", "original")
+        mode = exact_mode or (
+            "thumbnail"
+            if getattr(self, "thumbnail_only", False)
+            else getattr(self, "image_mode", "compressed")
         )
-        arguments = {
-            "shard": row.get("shard"),
-            "tier": "thumb" if mode == "thumbnail" else "best",
-        }
+        if mode not in {"thumbnail", "compressed"}:
+            raise ValueError("Unknown image source mode")
+        tier = "thumb" if mode == "thumbnail" else "mid"
         raw = self.db.get_message_row(
             user, row["local_id"], local_type=3, shard=row.get("shard")
         )
         if not raw:
             raise ValueError("The image message is no longer available")
         files = self.media._image_files(user, self.media._img_md5(raw))
-        tier = "thumb"
-        if mode != "thumbnail":
-            original = files.get("original")
-            if (
-                mode == "original"
-                and original
-                and self.media.original_ready(
-                    original[1], (files.get("mid") or (None, 0))[1]
-                )
-            ):
-                tier = "original"
-            elif "mid" in files:
-                tier = "mid"
         target = files.get(tier)
-        if exact_mode is not None:
-            tier = {"thumbnail": "thumb", "compressed": "mid", "original": "original"}[
-                exact_mode
-            ]
-            target = files.get(tier)
-            arguments["tier"] = tier
-            if (
-                tier == "original"
-                and target
-                and not self.media.original_ready(
-                    target[1], (files.get("mid") or (None, 0))[1]
-                )
-            ):
-                target = None
-        elif mode == "compressed":
-            arguments["tier"] = tier
         if not target:
             raise FileNotFoundError("WeChat has not cached this image yet")
+        arguments = {"shard": row.get("shard"), "tier": tier}
         probe = self.media._probe_ct(target[0])
         if probe:
             key, xor = self._keys.resolve(self.media, probe)
@@ -130,37 +102,5 @@ class DatabaseSource:
         result = self.media.download_image(user, row["local_id"], **arguments)
         if not result or not Path(result).is_file():
             raise FileNotFoundError("No complete cached image is available")
-        self.image_kind = {
-            "thumb": "thumbnail",
-            "original": "original",
-            "mid": "compressed",
-        }[tier]
+        self.image_kind = mode
         return Path(result)
-
-    def original(self, user: str, row: dict[str, Any], name: str) -> Path | None:
-        if name.endswith(f" [{user}]"):
-            name = name[: -(len(user) + 3)]
-        raw = self.db.get_message_row(
-            user, row["local_id"], local_type=3, shard=row.get("shard")
-        )
-        if not raw:
-            return None
-        files = self.media._image_files(user, self.media._img_md5(raw))
-        target = files.get("original") or files.get("mid") or files.get("thumb")
-        if not target:
-            return None
-        arguments: dict[str, Any] = {}
-        probe = self.media._probe_ct(target[0])
-        if probe:
-            key, xor = self._keys.resolve(self.media, probe)
-            arguments.update(aes_key=key, xor_key=xor)
-        result = self.media.download_image_original(
-            user,
-            row["local_id"],
-            shard=row.get("shard"),
-            chat_name=name,
-            timeout=15,
-            max_scrolls=2,
-            **arguments,
-        )
-        return Path(result) if result else None

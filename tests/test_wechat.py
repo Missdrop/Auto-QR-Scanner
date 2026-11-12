@@ -57,6 +57,16 @@ class WeChatTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.wechat.start(["  "], self.received.append, self.notices.append)
 
+    def test_removed_original_source_is_rejected_before_monitoring(self) -> None:
+        with self.assertRaises(ValueError):
+            self.wechat.start(
+                ["Chat"],
+                self.received.append,
+                self.notices.append,
+                image_modes=["original"],
+            )
+        self.assertIsNone(self.wechat._thread)
+
     def test_polling_skips_baseline_and_checks_group(self) -> None:
         client = Mock()
         client.ChatInfo.return_value = {"chat_name": "Group", "chat_type": "group"}
