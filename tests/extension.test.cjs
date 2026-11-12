@@ -7,18 +7,23 @@ const path = require("node:path");
 function createPage() {
     const events = [];
     const stored = new Map();
+    const desktopStored = new Map();
+    let inspector;
     const context = vm.createContext({
         sessionStorage: { getItem: key => stored.get(key) ?? null },
-        localStorage: { getItem: () => null },
+        localStorage: { getItem: key => desktopStored.get(key) ?? null },
         location: { hash: "#/home" },
         setInterval: () => {},
-        chrome: { runtime: { onMessage: { addListener: () => {} }, sendMessage: async message => {
+        chrome: { runtime: { onMessage: { addListener: callback => { inspector = callback; } }, sendMessage: async message => {
             events.push(message.payload);
             return { ok: true };
         } } },
     });
     vm.runInContext(fs.readFileSync(path.join(__dirname, "../browser_extension/content.js"), "utf8"), context);
-    return { context, stored, events };
+    return {
+        context, stored, desktopStored, events,
+        inspect: () => new Promise(resolve => inspector({ type: "inspect-session" }, {}, resolve)),
+    };
 }
 
 test("companion sends session once and detects logout", async () => {
@@ -99,4 +104,24 @@ test("background rejects events from other origins and non-student pages", async
         assert.equal(reply.ok, false);
     }
     assert.equal(background.requests.length, 0);
+});
+
+test("desktop session is forwarded without parsing a plain token as JSON", async () => {
+    const { context, desktopStored, events } = createPage();
+    desktopStored.set("Token", "plain-token");
+    desktopStored.set("userInfo", JSON.stringify({ userId: "student" }));
+    await vm.runInContext("synchronize()", context);
+    assert.equal(events[0].event, "session");
+    assert.equal(events[0].token, "plain-token");
+});
+
+test("session diagnostics expose field names without student or token values", async () => {
+    const page = createPage();
+    page.desktopStored.set("Token", "private-token-value");
+    page.desktopStored.set("userInfo", JSON.stringify({ userId: "private-student-value" }));
+    const diagnostic = await page.inspect();
+    assert.equal(diagnostic.sessionDetected, true);
+    assert.ok(diagnostic.desktopFields.includes("userId"));
+    assert.ok(!JSON.stringify(diagnostic).includes("private-token-value"));
+    assert.ok(!JSON.stringify(diagnostic).includes("private-student-value"));
 });
