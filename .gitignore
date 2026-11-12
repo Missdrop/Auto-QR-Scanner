@@ -18,3 +18,7 @@ Thumbs.db
 .ruff_cache/
 .pytest_cache/
 tmp/
+
+# Local agent instructions are not repository content.
+AGENTS.md
+agent.md

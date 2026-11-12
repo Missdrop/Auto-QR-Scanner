@@ -5,7 +5,6 @@ import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-from queue import Empty
 from time import monotonic
 from typing import Any
 from uuid import uuid4
@@ -26,31 +25,38 @@ class DatabaseReader:
         self._images = images
         self._output = output
         self._stopped = stopped
-        self._feedback = feedback
-        self._decoded: set[str] = set()
         self._versions: dict[str, str] = {}
         self._downloads: OriginalDownloads | None = None
         self._image_mode: str | None = None
-
-    def acknowledgements(self) -> None:
-        if self._feedback is None:
-            return
-        while True:
-            try:
-                self._decoded.add(self._feedback.get_nowait())
-            except Empty:
-                return
+        self._image_modes: list[str] | None = None
 
     def notice(self, message: str) -> None:
         self._output.put(("notice", message))
 
     def deliver(self, name: str, photo: DatabasePhoto) -> None:
-        source = photo.download()
+        if self._image_modes is not None:
+            for mode in self._image_modes:
+                try:
+                    source = photo.download(mode)
+                except FileNotFoundError:
+                    continue
+                self._deliver_source(name, photo, source, photo.id + ":" + mode)
+            return
+        self._deliver_source(name, photo, photo.download(), photo.id)
+
+    def _complete(self, photo: DatabasePhoto) -> bool:
+        return self._image_modes is not None and all(
+            photo.id + ":" + mode in self._versions for mode in self._image_modes
+        )
+
+    def _deliver_source(
+        self, name: str, photo: DatabasePhoto, source: Path, key: str
+    ) -> None:
         with source.open("rb") as stream:
             digest = hashlib.file_digest(stream, "sha256").hexdigest()
-        if self._versions.get(photo.id) == digest:
+        if self._versions.get(key) == digest:
             return
-        self._versions[photo.id] = digest
+        self._versions[key] = digest
         self._images.mkdir(parents=True, exist_ok=True)
         destination = self._images / (uuid4().hex + source.suffix)
         shutil.copyfile(source, destination)
@@ -87,7 +93,11 @@ class DatabaseReader:
                     raise ValueError("No recent incoming image in the requested chat")
                 if self._downloads is not None:
                     self._downloads.submit(photo.id, name, user, photo.row)
-                if self._downloads is not None or self._image_mode == "compressed":
+                if (
+                    self._downloads is not None
+                    or self._image_mode == "compressed"
+                    or self._image_modes is not None
+                ):
                     pending[user + ":" + photo.id] = (name, photo, monotonic() + 60)
                 self.deliver(name, photo)
         if latest_only and not pending:
@@ -95,7 +105,6 @@ class DatabaseReader:
 
         self.notice("Monitoring selected chats in the background")
         while not self._stopped.wait(0.3):
-            self.acknowledgements()
             if self._downloads is not None:
                 self._downloads.poll()
             for name, user in [] if latest_only else users.items():
@@ -113,13 +122,6 @@ class DatabaseReader:
             for key, (name, photo, deadline) in list(pending.items()):
                 if self._stopped.is_set():
                     return
-                if photo.id in self._decoded:
-                    if self._downloads is not None:
-                        self._downloads.cancel(photo.id)
-                    self._decoded.discard(photo.id)
-                    self._versions.pop(photo.id, None)
-                    del pending[key]
-                    continue
                 try:
                     self.deliver(name, photo)
                 except FileNotFoundError:
@@ -130,6 +132,9 @@ class DatabaseReader:
                     self.notice(
                         f"Cannot decrypt cached image: {type(exception).__name__}"
                     )
+                if self._complete(photo):
+                    del pending[key]
+                    continue
                 if monotonic() < deadline:
                     continue
                 self._versions.pop(photo.id, None)
@@ -147,6 +152,7 @@ def read_database(
     feedback: Any = None,
     download_originals: bool = False,
     image_mode: str | None = None,
+    image_modes: list[str] | None = None,
 ) -> None:
     """
     Isolate dependency startup and keep third-party diagnostics out of IPC output.
@@ -159,7 +165,12 @@ def read_database(
     ):
         reader = DatabaseReader(images, output, stopped, feedback)
         reader._image_mode = image_mode
-        if image_mode == "original" or (image_mode is None and download_originals):
+        reader._image_modes = image_modes
+        if (
+            (image_modes is not None and "original" in image_modes)
+            or image_mode == "original"
+            or (image_mode is None and download_originals)
+        ):
             reader._downloads = OriginalDownloads(
                 images.parent / "wechat", images, reader.notice
             )
