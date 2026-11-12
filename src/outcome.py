@@ -13,6 +13,7 @@ class Outcome:
 
     def label(self) -> str:
         states = {
+            "opened": "已在内置浏览器打开",
             "queued": "等待扫码",
             "processing": "正在扫码",
             "login": "需要登录",

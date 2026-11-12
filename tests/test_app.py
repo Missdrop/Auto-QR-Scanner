@@ -54,7 +54,7 @@ class AppTest(unittest.TestCase):
                 root / "profile",
             )
             try:
-                self.assertIsNotNone(controller._student._server)
+                self.assertIsNone(controller._student._server)
                 barcode = zxingcpp.create_barcode(
                     "https://example.com", zxingcpp.BarcodeFormat.QRCode
                 )
