@@ -60,6 +60,7 @@ class WeChat:
     ) -> None:
         client: Any = None
         com: Any = None
+        stopped_message = "Monitoring stopped"
         try:
             com = importlib.import_module("pythoncom")
             com.CoInitialize()
@@ -70,16 +71,20 @@ class WeChat:
             else:
                 self._poll(client, names, receive, notify)
         except Exception as exception:
-            notify(
-                f"WeChat unavailable: {type(exception).__name__}. "
-                "Check login, client compatibility and the optional backend."
+            reason = f"{type(exception).__name__}: {exception}"
+            stopped_message = (
+                f"Monitoring stopped: {reason}. Check WeChat login, "
+                "client compatibility and the optional backend."
             )
         finally:
             if client is not None and hasattr(client, "StopListening"):
-                client.StopListening()
+                try:
+                    client.StopListening()
+                except Exception:
+                    pass
             if com is not None:
                 com.CoUninitialize()
-            notify("Monitoring stopped")
+            notify(stopped_message)
 
     @staticmethod
     def _load_backend() -> Any:
@@ -127,7 +132,7 @@ class WeChat:
 
         # Snapshot visible messages before monitoring; never process old history.
         for message in client.GetAllMessage():
-            self._seen.add(str(message.id))
+            self._seen.add(name + ":" + str(message.id))
         notify("Monitoring group; keep the selected WeChat chat open")
         while not self._stop.wait(0.3):
             if client.ChatInfo().get("chat_name") != name:
@@ -143,9 +148,10 @@ class WeChat:
         notify: Callable[[str], None],
     ) -> None:
         message_id = str(message.id)
-        if message_id in self._seen:
+        key = group + ":" + message_id
+        if key in self._seen:
             return
-        self._seen.add(message_id)
+        self._seen.add(key)
         if message.attr != "friend" or message.type != "image":
             return
         received_at = datetime.now().astimezone()
