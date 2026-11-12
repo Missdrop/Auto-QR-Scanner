@@ -1,5 +1,0 @@
-Generated using the built-in image_gen tool.
-
-Use case: logo-brand. Asset type: square Windows desktop app icon for Auto QR Scanner. Primary request: design one original, crisp, minimal icon that combines the three recognizable QR finder squares with four scanning viewfinder corners, suggesting automatic scanning. Strong simple geometry, refined balanced negative space, legible at 32 pixels, polished modern utility-app identity, flat vector-like rendering. One centered symbol fills most of a square tile. No text, no letters, no actual scannable data, no brand logos, no mockup, no surrounding scene, no border sheet. The entire image is the single finished square app icon.
-
-The PNG is the generated artwork. The ICO contains 16, 24, 32, 48, 64, 128 and 256 pixel versions for Windows.
