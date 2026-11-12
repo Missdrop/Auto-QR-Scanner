@@ -17,3 +17,5 @@ Validate each independent change before making a small local commit. Use a short
 Push, pull request creation and merging require explicit user instructions. Include only files related to the current task.
 
 The `wechat` extra installs the free Windows backend. Local image tests do not require a logged-in WeChat client. Integration with a real group, student login and a valid AMS code must be reported separately from automated tests. Keep private photos, databases and browser profiles out of Git.
+
+After installing the pinned Chromium runtime, set `$env:QR_BROWSER_TESTS='1'` to include browser integration tests. These tests intercept all network traffic and use synthetic session values; they never process a real school code. Do not replace the pinned unbranded executable with Playwright's downloaded Chrome for Testing.
