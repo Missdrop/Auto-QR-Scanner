@@ -18,6 +18,7 @@ class StudentTest(unittest.TestCase):
             "http://ams.xjtlu.edu.cn/studenth5/",
             "https://ams.xjtlu.edu.cn.evil.test/studenth5/",
             "https://user@ams.xjtlu.edu.cn/studenth5/",
+            "https://[",
             "file:///studenth5/",
             "javascript:alert(1)",
         ]:
@@ -62,3 +63,43 @@ class StudentTest(unittest.TestCase):
         response.json.side_effect = ValueError("not JSON")
         self.student._on_response(response)
         self.assertEqual(self.messages, [])
+
+    def test_nested_login_failure_is_not_success(self) -> None:
+        response = Mock()
+        response.url = HOME_URL
+        response.request.resource_type = "xhr"
+        response.json.return_value = {
+            "code": 0,
+            "data": {"loginInfo": {"code": 401}, "checkInfo": {"code": 0}},
+        }
+        self.student._page = Mock()
+        self.student._on_response(response)
+        self.assertIn("Login required", self.messages[-1])
+
+    def test_redirect_during_session_capture_is_recoverable(self) -> None:
+        from playwright.sync_api import Error
+
+        page = Mock()
+        page.url = HOME_URL
+        page.evaluate.side_effect = Error("Execution context was destroyed")
+        self.student._page = page
+        self.assertIsNone(self.student._capture_session())
+
+    def test_validated_platform_result_is_required_for_success(self) -> None:
+        response = Mock()
+        response.url = HOME_URL
+        response.request.resource_type = "xhr"
+        response.json.return_value = {"code": 0, "data": {"checkInfo": {"code": 1}}}
+        self.student._on_response(response)
+        self.assertIn("did not confirm", self.messages[-1])
+        response.json.return_value = {"code": 0, "data": {"checkInfo": {"code": 0}}}
+        self.student._on_response(response)
+        self.assertIn("confirmed successful", self.messages[-1])
+
+    def test_repeated_login_does_not_interrupt_sso(self) -> None:
+        page = Mock()
+        page.url = "https://sso.xjtlu.edu.cn/login"
+        self.student._page = page
+        self.student._navigate(HOME_URL)
+        page.goto.assert_not_called()
+        page.bring_to_front.assert_called_once()
