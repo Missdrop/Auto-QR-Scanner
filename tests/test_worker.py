@@ -14,6 +14,15 @@ from storage.history import History
 
 
 class WorkerTest(unittest.TestCase):
+    def test_closed_worker_rejects_new_work(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            worker = Worker(Mock(), History(root / "history.sqlite3"), Mock(), Mock())
+            worker.close()
+            message = ImageMessage("one", "Chat", root / "image.jpg", datetime.now())
+            self.assertFalse(worker.submit(message))
+            self.assertEqual(worker._queue.qsize(), 0)
+
     def test_success_does_not_skip_other_versions_of_the_same_message(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

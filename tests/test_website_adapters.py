@@ -10,6 +10,34 @@ from browser.session import BrowserSession
 
 
 class WebsiteAdaptersTest(unittest.TestCase):
+    def test_adapter_can_define_a_structured_response_type(self):
+        with tempfile.TemporaryDirectory() as directory:
+            site = Path(directory) / "example"
+            site.mkdir()
+            (site / "adapter.py").write_text(
+                "from __future__ import annotations\n"
+                "from dataclasses import dataclass\n"
+                "from adapters.base import WebsiteAdapter\n"
+                "@dataclass\n"
+                "class Response:\n"
+                "    title: str\n"
+                "class Adapter(WebsiteAdapter):\n"
+                "    def matches(self, url): return True\n"
+                "    def process(self, page, url): return Response('Accepted')\n"
+                "    def get_result(self, response): return response.title\n"
+                "    def get_details(self, response): return ''\n"
+            )
+            registry = WebsiteAdapters(Path(directory))
+            self.assertEqual(registry.information()[0]["status"], "loaded")
+
+    def test_manual_links_reject_malformed_ports_and_ambiguous_separators(self):
+        for url in [
+            "https://example.com:bad/",
+            "https://example.com\\@evil.example/",
+            "https://exam\nple.com/",
+        ]:
+            self.assertFalse(BrowserSession.is_web_url(url), url)
+
     def test_adapter_information_includes_metadata_and_load_errors(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

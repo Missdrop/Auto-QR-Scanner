@@ -1,5 +1,7 @@
+import sys
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from uuid import uuid4
 
 from adapters.base import WebsiteAdapter
 
@@ -31,7 +33,7 @@ class WebsiteAdapters:
     def _load(self) -> None:
         if self._adapters is None:
             adapters = []
-            for index, path in enumerate(sorted(self._directory.glob("*/adapter.py"))):
+            for path in sorted(self._directory.glob("*/adapter.py")):
                 row = {
                     "name": path.parent.name,
                     "version": "",
@@ -40,13 +42,14 @@ class WebsiteAdapters:
                     "status": "error",
                     "error": "",
                 }
+                module_name = f"local_website_adapter_{uuid4().hex}"
                 try:
-                    spec = spec_from_file_location(
-                        f"local_website_adapter_{index}", path
-                    )
+                    spec = spec_from_file_location(module_name, path)
                     if spec is None or spec.loader is None:
                         raise ValueError("Cannot load adapter")
                     module = module_from_spec(spec)
+                    # Type decorators resolve their module while executing the file.
+                    sys.modules[module_name] = module
                     spec.loader.exec_module(module)
                     adapter = module.Adapter()
                     if not isinstance(adapter, WebsiteAdapter):
@@ -58,6 +61,7 @@ class WebsiteAdapters:
                     adapters.append(adapter)
                     row["status"] = "loaded"
                 except Exception as exception:
+                    sys.modules.pop(module_name, None)
                     row["error"] = type(exception).__name__
                 self._information.append(row)
             self._adapters = adapters

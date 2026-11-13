@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from queue import Empty, Full, Queue
-from threading import Event, Thread
+from threading import Event, Lock, Thread
 
 from models.message import ImageMessage
 from models.result import ScanResult
@@ -26,10 +26,17 @@ class Worker:
         self._notify = notify
         self._queue: Queue[tuple[ImageMessage, bool]] = Queue(maxsize=64)
         self._stop = Event()
+        self._state_lock = Lock()
         self._thread = Thread(target=self._run, name="image-scanner", daemon=True)
         self._thread.start()
 
     def submit(self, message: ImageMessage, automatic: bool = False) -> bool:
+        with self._state_lock:
+            if self._stop.is_set():
+                return False
+            return self._enqueue(message, automatic)
+
+    def _enqueue(self, message: ImageMessage, automatic: bool) -> bool:
         try:
             self._queue.put_nowait((message, automatic))
             return True
@@ -38,7 +45,8 @@ class Worker:
             return False
 
     def close(self) -> None:
-        self._stop.set()
+        with self._state_lock:
+            self._stop.set()
         self._thread.join(timeout=5)
 
     def _run(self) -> None:

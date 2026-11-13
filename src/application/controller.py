@@ -140,9 +140,13 @@ class App(QObject):
                 break
 
     def _submit_incoming(self, message: ImageMessage) -> None:
+        if self._closed:
+            return
         self._worker.submit(message, self._window.automatic_open())
 
     def _show_result(self, result: ScanResult, automatic: bool) -> None:
+        if self._closed:
+            return
         self._window.add_result(result)
         self._window.show_status(f"{result.status()}: {result.message.image_path.name}")
         if automatic:

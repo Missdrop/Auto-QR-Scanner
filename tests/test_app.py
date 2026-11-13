@@ -25,6 +25,31 @@ from wechat.client import WeChat
 
 
 class AppTest(unittest.TestCase):
+    def test_late_scan_results_do_not_open_links_after_closing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            window = Window(
+                QSettings(str(root / "settings.ini"), QSettings.Format.IniFormat)
+            )
+            controller = App(
+                WeChat(root / "images"),
+                Scanner(ImageProcessor()),
+                History(root / "history.sqlite3"),
+                window,
+                root / "browser",
+            )
+            result = ScanResult(
+                ImageMessage("one", "Chat", root / "image.jpg", datetime.now()),
+                [Code("https://example.com/qr")],
+            )
+            try:
+                controller.close()
+                with patch.object(controller._session, "open") as open_browser:
+                    controller._show_result(result, True)
+                    open_browser.assert_not_called()
+            finally:
+                window.close()
+
     def test_adapter_dialog_displays_information_and_reuses_its_window(self):
         with tempfile.TemporaryDirectory() as directory:
             window = Window(

@@ -2,9 +2,9 @@ from collections import deque
 from collections.abc import Callable
 from pathlib import Path
 from threading import Lock, Thread
-from urllib.parse import urlsplit
 
 from adapters.registry import WebsiteAdapter, WebsiteAdapters
+from browser.address_filter import AddressFilter
 from browser.client import Browser
 from models.outcome import Outcome
 
@@ -103,16 +103,7 @@ class BrowserSession:
 
     @staticmethod
     def is_web_url(url: str) -> bool:
-        try:
-            parts = urlsplit(url)
-            return (
-                parts.scheme in {"http", "https"}
-                and bool(parts.hostname)
-                and parts.username is None
-                and parts.password is None
-            )
-        except ValueError:
-            return False
+        return AddressFilter("").allows(url)
 
     def status(self) -> str:
         return ""
