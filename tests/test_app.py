@@ -19,6 +19,7 @@ from src.message import ImageMessage
 from src.outcome import Outcome
 from src.result import Code, ScanResult
 from src.scanner import Scanner
+from src.website_adapters import WebsiteAdapters
 from src.wechat import WeChat
 from src.window import Window
 
@@ -27,6 +28,51 @@ class AppTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.application = QApplication.instance() or QApplication([])
+
+    def test_scanning_without_adapters_records_opened_not_business_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            window = Window(
+                QSettings(str(root / "settings.ini"), QSettings.Format.IniFormat)
+            )
+            history = History(root / "history.sqlite3")
+            controller = App(
+                WeChat(root / "images"),
+                Scanner(ImageProcessor()),
+                history,
+                window,
+                root / "browser",
+            )
+            controller._session._adapters = WebsiteAdapters(root / "empty_adapters")
+            url = "https://example.com/qr"
+            barcode = zxingcpp.create_barcode(url, zxingcpp.BarcodeFormat.QRCode)
+            image = root / "qr.png"
+            cv2.imencode(".png", np.asarray(barcode.to_image(scale=5)))[1].tofile(image)
+            try:
+                with (
+                    patch.object(
+                        controller._session._browser, "open", return_value=True
+                    ) as navigate,
+                    patch.object(controller._session._browser, "process") as process,
+                ):
+                    controller._submit_incoming(
+                        ImageMessage("fixture", "Fixture", image, datetime.now())
+                    )
+                    deadline = time.monotonic() + 5
+                    while history.outcome(url) is None and time.monotonic() < deadline:
+                        self.application.processEvents()
+                        time.sleep(0.01)
+                    navigate.assert_called_once_with(url)
+                    process.assert_not_called()
+                self.assertEqual(history.recent()[0].codes[0].text, url)
+                outcome = history.outcome(url)
+                self.assertEqual(outcome.status, "opened")
+                self.assertIsNone(outcome.code)
+                self.assertEqual(outcome.label(), "已在内置浏览器打开")
+                self.assertNotEqual(outcome.label(), "处理成功")
+            finally:
+                controller.close()
+                window.close()
 
     def test_local_image_reaches_window_without_opening_browser(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
