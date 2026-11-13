@@ -1,7 +1,7 @@
 import struct
 import unittest
 
-from src.image_keys import ImageKeys
+from wechat.image_keys import ImageKeys
 
 
 class ImageKeysTest(unittest.TestCase):

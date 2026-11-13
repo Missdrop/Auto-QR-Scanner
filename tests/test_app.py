@@ -12,33 +12,122 @@ import zxingcpp
 from PySide6.QtCore import QSettings, QTimer
 from PySide6.QtWidgets import QApplication
 
-from src.app import App
-from src.history import History
-from src.image_processor import ImageProcessor
-from src.message import ImageMessage
-from src.outcome import Outcome
-from src.result import Code, ScanResult
-from src.scanner import Scanner
-from src.student import Student
-from src.wechat import WeChat
-from src.window import Window
+from adapters.registry import WebsiteAdapters
+from application.controller import App
+from models.message import ImageMessage
+from models.outcome import Outcome
+from models.result import Code, ScanResult
+from scanning.image_processor import ImageProcessor
+from scanning.scanner import Scanner
+from storage.history import History
+from ui.window import Window
+from wechat.client import WeChat
 
 
 class AppTest(unittest.TestCase):
+    def test_late_scan_results_do_not_open_links_after_closing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            window = Window(
+                QSettings(str(root / "settings.ini"), QSettings.Format.IniFormat)
+            )
+            controller = App(
+                WeChat(root / "images"),
+                Scanner(ImageProcessor()),
+                History(root / "history.sqlite3"),
+                window,
+                root / "browser",
+            )
+            result = ScanResult(
+                ImageMessage("one", "Chat", root / "image.jpg", datetime.now()),
+                [Code("https://example.com/qr")],
+            )
+            try:
+                controller.close()
+                with patch.object(controller._session, "open") as open_browser:
+                    controller._show_result(result, True)
+                    open_browser.assert_not_called()
+            finally:
+                window.close()
+
+    def test_adapter_dialog_displays_information_and_reuses_its_window(self):
+        with tempfile.TemporaryDirectory() as directory:
+            window = Window(
+                QSettings(
+                    str(Path(directory) / "settings.ini"), QSettings.Format.IniFormat
+                )
+            )
+            rows = [
+                {
+                    "name": "Example adapter",
+                    "version": "1.0",
+                    "description": "Example",
+                    "status": "loaded",
+                    "path": "example/adapter.py",
+                    "error": "",
+                }
+            ]
+            try:
+                window.show_adapters(rows)
+                dialog = window._adapter_dialog
+                self.assertEqual(dialog.table.item(0, 0).text(), "Example adapter")
+                self.assertEqual(dialog.table.item(0, 3).text(), "已加载")
+                self.assertIn("example/adapter.py", dialog._details.toPlainText())
+                dialog.close()
+                window.show_adapters(rows)
+                self.assertIs(window._adapter_dialog, dialog)
+                self.assertTrue(dialog.isVisible())
+            finally:
+                window.close()
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.application = QApplication.instance() or QApplication([])
 
-    def setUp(self) -> None:
-        start = Student.start
-        bridge = patch.object(
-            Student,
-            "start",
-            autospec=True,
-            side_effect=lambda student: start(student, 0),
-        )
-        bridge.start()
-        self.addCleanup(bridge.stop)
+    def test_scanning_without_adapters_records_opened_not_business_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            window = Window(
+                QSettings(str(root / "settings.ini"), QSettings.Format.IniFormat)
+            )
+            history = History(root / "history.sqlite3")
+            controller = App(
+                WeChat(root / "images"),
+                Scanner(ImageProcessor()),
+                history,
+                window,
+                root / "browser",
+            )
+            controller._session._adapters = WebsiteAdapters(root / "empty_adapters")
+            url = "https://example.com/qr"
+            barcode = zxingcpp.create_barcode(url, zxingcpp.BarcodeFormat.QRCode)
+            image = root / "qr.png"
+            cv2.imencode(".png", np.asarray(barcode.to_image(scale=5)))[1].tofile(image)
+            try:
+                with (
+                    patch.object(
+                        controller._session._browser, "open", return_value=True
+                    ) as navigate,
+                    patch.object(controller._session._browser, "process") as process,
+                ):
+                    controller._submit_incoming(
+                        ImageMessage("fixture", "Fixture", image, datetime.now())
+                    )
+                    deadline = time.monotonic() + 5
+                    while history.outcome(url) is None and time.monotonic() < deadline:
+                        self.application.processEvents()
+                        time.sleep(0.01)
+                    navigate.assert_called_once_with(url)
+                    process.assert_not_called()
+                self.assertEqual(history.recent()[0].codes[0].text, url)
+                outcome = history.outcome(url)
+                self.assertEqual(outcome.status, "opened")
+                self.assertEqual(outcome.result, "")
+                self.assertEqual(outcome.label(), "已在内置浏览器打开")
+                self.assertNotEqual(outcome.label(), "处理成功")
+            finally:
+                controller.close()
+                window.close()
 
     def test_local_image_reaches_window_without_opening_browser(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -54,7 +143,6 @@ class AppTest(unittest.TestCase):
                 root / "profile",
             )
             try:
-                self.assertIsNone(controller._student._server)
                 barcode = zxingcpp.create_barcode(
                     "https://example.com", zxingcpp.BarcodeFormat.QRCode
                 )
@@ -62,7 +150,7 @@ class AppTest(unittest.TestCase):
                 cv2.imencode(".png", np.asarray(barcode.to_image(scale=5)))[1].tofile(
                     path
                 )
-                with patch.object(controller._student, "open") as open_browser:
+                with patch.object(controller._session, "open") as open_browser:
                     controller._scan_files([path])
                     deadline = time.monotonic() + 5
                     while not window._records and time.monotonic() < deadline:
@@ -101,10 +189,10 @@ class AppTest(unittest.TestCase):
                 Scanner(ImageProcessor()),
                 history,
                 window,
-                root / "student",
+                root / "session",
             )
             try:
-                url = "https://ams.xjtlu.edu.cn/studenth5/#/?state=example"
+                url = "https://example.com/qr/#/?state=example"
                 result = ScanResult(
                     ImageMessage("one", "Chat", root / "image.png", datetime.now()),
                     [Code(url)],
@@ -112,22 +200,23 @@ class AppTest(unittest.TestCase):
                 history.save(result)
                 controller._show_result(result, False)
                 controller.platform_completed.emit(
-                    Outcome(url, "result", 1001, "Expired")
+                    Outcome(url, "result", "二维码已过期", "Expired")
                 )
                 window._table.selectRow(0)
-                self.assertEqual(window._details._code.text(), "1001")
+                self.assertEqual(window._details._outcome.text(), "二维码已过期")
                 self.assertEqual(window._details._outcome.text(), "二维码已过期")
                 self.assertEqual(window.windowTitle(), "Auto QR Scanner")
                 self.assertEqual(
                     window._table.horizontalHeaderItem(5).text(), "扫码结果"
                 )
                 self.assertEqual(window._table.item(0, 5).text(), "二维码已过期")
-                controller._show_student_notice(
+                controller._show_session_notice(
                     "Platform rejected the QR code: Expired"
                 )
-                self.assertEqual(window._student_status.text(), "二维码已过期")
+                self.assertEqual(window._session_status.text(), "二维码已过期")
                 self.assertEqual(
-                    History(root / "history.sqlite3").outcome(url).code, 1001
+                    History(root / "history.sqlite3").outcome(url).result,
+                    "二维码已过期",
                 )
             finally:
                 controller.close()
@@ -155,11 +244,11 @@ class AppTest(unittest.TestCase):
             try:
                 for status in ["error", "login", "cancelled", "queued", "result"]:
                     history.save_outcome(Outcome(url, status))
-                    with patch.object(controller._student, "open") as open_browser:
+                    with patch.object(controller._session, "open") as open_browser:
                         controller._show_result(result, True)
                         open_browser.assert_not_called()
-                with patch.object(controller._student, "open") as open_browser:
-                    controller._open_student(url)
+                with patch.object(controller._session, "open") as open_browser:
+                    controller._open_session(url)
                     open_browser.assert_called_once_with(url)
             finally:
                 controller.close()
@@ -219,20 +308,20 @@ class AppTest(unittest.TestCase):
             )
             try:
                 window._addresses.setPlainText("https://example.com/qr/")
-                with patch.object(controller._student, "open") as open_browser:
+                with patch.object(controller._session, "open") as open_browser:
                     controller._show_result(result, True)
                     open_browser.assert_called_once_with(allowed)
                 self.assertEqual(history.outcome(blocked).status, "filtered")
                 self.assertEqual(history.outcome(blocked).label(), "已被地址过滤")
                 window._addresses.clear()
-                with patch.object(controller._student, "open") as open_browser:
+                with patch.object(controller._session, "open") as open_browser:
                     controller._show_result(result, True)
                     self.assertEqual(open_browser.call_count, 2)
-                history.save_outcome(Outcome(blocked, "result", 0))
+                history.save_outcome(Outcome(blocked, "result", "Custom result"))
                 window._addresses.setPlainText("example.com")
-                with patch.object(controller._student, "open"):
+                with patch.object(controller._session, "open"):
                     controller._show_result(result, True)
-                self.assertEqual(history.outcome(blocked).code, 0)
+                self.assertEqual(history.outcome(blocked).result, "Custom result")
                 window._addresses.setPlainText("https://")
                 with patch.object(controller._wechat, "start") as start:
                     controller._start_monitoring(["Chat"])

@@ -1,6 +1,6 @@
 import unittest
 
-from src.address_filter import AddressFilter
+from browser.address_filter import AddressFilter
 
 
 class AddressFilterTest(unittest.TestCase):

@@ -5,15 +5,24 @@ from pathlib import Path
 from threading import Event
 from unittest.mock import Mock
 
-from src.history import History
-from src.image_processor import ImageProcessor
-from src.message import ImageMessage
-from src.result import Code, ScanResult
-from src.scanner import Scanner
-from src.worker import Worker
+from application.worker import Worker
+from models.message import ImageMessage
+from models.result import Code, ScanResult
+from scanning.image_processor import ImageProcessor
+from scanning.scanner import Scanner
+from storage.history import History
 
 
 class WorkerTest(unittest.TestCase):
+    def test_closed_worker_rejects_new_work(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            worker = Worker(Mock(), History(root / "history.sqlite3"), Mock(), Mock())
+            worker.close()
+            message = ImageMessage("one", "Chat", root / "image.jpg", datetime.now())
+            self.assertFalse(worker.submit(message))
+            self.assertEqual(worker._queue.qsize(), 0)
+
     def test_success_does_not_skip_other_versions_of_the_same_message(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

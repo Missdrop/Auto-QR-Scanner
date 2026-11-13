@@ -4,7 +4,7 @@ from pathlib import Path
 from queue import Empty
 from unittest.mock import Mock, patch
 
-from src.wechat import WeChat
+from wechat.client import WeChat
 
 
 class WeChatTest(unittest.TestCase):
@@ -15,7 +15,10 @@ class WeChatTest(unittest.TestCase):
         process.is_alive.return_value = False
         process.exitcode = 1
         context.Queue.return_value.get.side_effect = Empty
-        with patch("src.wechat.multiprocessing.get_context", return_value=context):
+        with patch(
+            "wechat.client.multiprocessing.get_context",
+            return_value=context,
+        ):
             self.wechat._run(["Chat"], self.received.append, self.notices.append)
         self.assertIn("exited unexpectedly", self.notices[-1])
 
@@ -87,7 +90,7 @@ class WeChatTest(unittest.TestCase):
         reader.name.return_value = "Group"
         reader.messages.return_value = [old]
         self.wechat._stop.set()
-        with patch("src.passive_chat.PassiveChat", return_value=reader):
+        with patch("wechat.passive_chat.PassiveChat", return_value=reader):
             self.wechat._poll(
                 client, ["Group"], self.received.append, self.notices.append
             )
@@ -107,8 +110,11 @@ class WeChatTest(unittest.TestCase):
         com.CoUninitialize.side_effect = lambda: events.append("uninitialized")
 
         with (
-            patch("src.qt_access.QtAccess", return_value=access),
-            patch("src.wechat.importlib.import_module", return_value=com),
+            patch("wechat.qt_access.QtAccess", return_value=access),
+            patch(
+                "wechat.client.importlib.import_module",
+                return_value=com,
+            ),
             patch.object(self.wechat, "_load_backend", return_value=module),
             patch.object(self.wechat, "_poll") as poll,
             patch.object(self.wechat, "_listen") as listen,
@@ -135,7 +141,7 @@ class WeChatTest(unittest.TestCase):
         reader.messages.side_effect = [[old], [old, new]]
         client = Mock()
         with (
-            patch("src.passive_chat.PassiveChat", return_value=reader),
+            patch("wechat.passive_chat.PassiveChat", return_value=reader),
             patch.object(self.wechat._stop, "wait", side_effect=[False, True]),
         ):
             self.wechat._poll(
@@ -152,7 +158,7 @@ class WeChatTest(unittest.TestCase):
         reader.is_foreground.return_value = False
         reader.messages.return_value = []
         with (
-            patch("src.passive_chat.PassiveChat", return_value=reader),
+            patch("wechat.passive_chat.PassiveChat", return_value=reader),
             patch.object(self.wechat._stop, "wait", side_effect=[False, True]),
         ):
             self.wechat._poll(
@@ -173,7 +179,7 @@ class WeChatTest(unittest.TestCase):
         reader.name.return_value = "Chat"
         reader.is_foreground.return_value = True
         reader.messages.return_value = [older, latest, outgoing]
-        with patch("src.passive_chat.PassiveChat", return_value=reader):
+        with patch("wechat.passive_chat.PassiveChat", return_value=reader):
             self.wechat._poll(
                 Mock(),
                 ["Chat"],
@@ -190,8 +196,8 @@ class WeChatTest(unittest.TestCase):
         module.WeChat.side_effect = OSError("Window unavailable")
         access = Mock()
         with (
-            patch("src.qt_access.QtAccess", return_value=access),
-            patch("src.wechat.importlib.import_module"),
+            patch("wechat.qt_access.QtAccess", return_value=access),
+            patch("wechat.client.importlib.import_module"),
             patch.object(self.wechat, "_load_backend", return_value=module),
         ):
             self.wechat._run_ui(["Group"], self.received.append, self.notices.append)
@@ -212,7 +218,10 @@ class WeChatTest(unittest.TestCase):
         process.pid = 123
         process.is_alive.return_value = True
         self.wechat._stop.set()
-        with patch("src.wechat.multiprocessing.get_context", return_value=context):
+        with patch(
+            "wechat.client.multiprocessing.get_context",
+            return_value=context,
+        ):
             self.wechat._run(["Chat"], self.received.append, self.notices.append)
         process.terminate.assert_called_once()
         context.Event.return_value.set.assert_called_once()

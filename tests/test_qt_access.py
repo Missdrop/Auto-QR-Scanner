@@ -2,7 +2,7 @@ import struct
 import unittest
 from unittest.mock import Mock, patch
 
-from src.qt_access import QtAccess
+from wechat.qt_access import QtAccess
 
 
 def image(writable: bool = True) -> bytes:
@@ -38,10 +38,10 @@ class QtAccessTest(unittest.TestCase):
             patch.object(access, "_window", return_value=(123, 456)) as find,
             patch.object(access, "has_tree", return_value=True),
             patch(
-                "src.qt_access.win32gui.IsWindowVisible",
+                "wechat.qt_access.win32gui.IsWindowVisible",
                 side_effect=[False, True, True],
             ),
-            patch("src.qt_access.win32gui.ShowWindow") as show,
+            patch("wechat.qt_access.win32gui.ShowWindow") as show,
         ):
             access.enable(lambda message: None, restore=True)
             find.assert_called_once_with(include_hidden=True)
@@ -52,7 +52,7 @@ class QtAccessTest(unittest.TestCase):
         with (
             patch.object(access, "_window", return_value=(123, 456)) as find,
             patch.object(access, "has_tree", return_value=True),
-            patch("src.qt_access.win32gui.ShowWindow") as show,
+            patch("wechat.qt_access.win32gui.ShowWindow") as show,
         ):
             access.enable(lambda message: None)
             find.assert_called_once_with(include_hidden=False)

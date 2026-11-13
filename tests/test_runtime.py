@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from src.runtime import Chromium
+from browser.runtime import Chromium
 
 
 class ChromiumTest(unittest.TestCase):

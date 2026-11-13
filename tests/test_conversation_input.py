@@ -5,8 +5,8 @@ from PySide6.QtGui import QTextCursor
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
-from src.conversation_input import ConversationInput
-from src.details import Details
+from ui.conversation_input import ConversationInput
+from ui.details import Details
 
 
 class ConversationInputTest(unittest.TestCase):

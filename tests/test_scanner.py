@@ -7,9 +7,9 @@ import cv2
 import numpy as np
 import zxingcpp
 
-from src.image_processor import ImageProcessor
-from src.message import ImageMessage
-from src.scanner import Scanner
+from models.message import ImageMessage
+from scanning.image_processor import ImageProcessor
+from scanning.scanner import Scanner
 
 
 def make_code(text: str) -> np.ndarray:

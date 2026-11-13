@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 import cv2
 import numpy as np
 
-from src.passive_chat import PassiveChat, Photo
+from wechat.passive_chat import PassiveChat, Photo
 
 
 class PassiveChatTest(unittest.TestCase):

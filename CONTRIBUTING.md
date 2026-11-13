@@ -8,16 +8,30 @@
 
 ```powershell
 uv sync --locked --extra wechat
-uv run --extra wechat python -m src.runtime --ensure
-uv run --extra wechat python -m src
+uv run --extra wechat python -m browser.runtime --ensure
+uv run --extra wechat python src/main.py
 ```
 
 启动脚本位于 `scripts`。Chromium 使用项目固定版本，不使用日常浏览器的资料，也不使用 Chrome for Testing 替代。
 
+## 目录结构
+
+`src` 只是源码目录，`src/main.py` 是唯一主入口，各功能目录是独立子包。
+
+- `src/application`：任务调度和应用流程。
+- `src/ui`：主窗口、详情、对话框和主题。
+- `src/wechat`：后台消息、联系人和图片缓存读取。
+- `src/scanning`：图片预处理和二维码识别。
+- `src/browser`：Chromium、会话和地址过滤。
+- `src/adapters`：公开的适配器基类和加载器。
+- `src/models`、`src/storage`：数据模型和本机存储。
+
+具体网站适配仍只放在不提交的 `website_adapters` 目录。
+
 仅识别本地图片，不打开链接：
 
 ```powershell
-uv run python -m src --scan "C:\photos\example.jpg"
+uv run python src/main.py --scan "C:\photos\example.jpg"
 ```
 
 可用 `--data "D:\AutoQRData"` 指定数据目录。
@@ -52,7 +66,7 @@ uv run --extra wechat python -W error::ResourceWarning -m unittest discover -s t
 3. PR 提交到 `main`，说明解决的问题、行为变化、验证结果和已知限制，只包含本次相关改动。
 4. 自动化协作者推送、创建 PR 或合并前，需要用户明确授权。
 
-不要提交私人图片、聊天数据库、密钥、浏览器资料、运行时和诊断输出。`data/wechat` 可能包含明文消息数据库；旧版会话兼容文件和 Chromium 登录资料也属于私人数据。
+不要提交私人图片、聊天数据库、密钥、浏览器资料、网站适配器、运行时和诊断输出。`data/wechat` 可能包含明文消息数据库；Chromium 登录资料也属于私人数据。
 
 ## 实现约定
 

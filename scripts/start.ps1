@@ -91,12 +91,12 @@ try {
     Write-Host '正在准备 Python 3.12 和项目依赖…'
     Invoke-Uv @('sync', '--locked', '--no-dev', '--extra', 'wechat', '--python', '3.12')
     Write-Host '正在检查 Chromium，缺少时自动下载…'
-    Invoke-Uv @('run', '--locked', '--no-dev', '--extra', 'wechat', 'python', '-m', 'src.runtime', '--ensure')
-    Invoke-Uv @('run', '--locked', '--no-dev', '--extra', 'wechat', 'python', '-c', 'import src.app, zxingcpp, wechatauto.db')
+    Invoke-Uv @('run', '--locked', '--no-dev', '--extra', 'wechat', 'python', '-m', 'browser.runtime', '--ensure')
+    Invoke-Uv @('run', '--locked', '--no-dev', '--extra', 'wechat', 'python', '-c', 'import application.controller, zxingcpp, wechatauto.db')
     Write-Host '运行环境准备完成。'
     if (-not $PrepareOnly) {
         $pythonWindow = Join-Path $projectRoot '.venv/Scripts/pythonw.exe'
-        Start-Process -FilePath $pythonWindow -ArgumentList '-m', 'src' -WorkingDirectory $projectRoot -WindowStyle Normal
+        Start-Process -FilePath $pythonWindow -ArgumentList 'src/main.py' -WorkingDirectory $projectRoot -WindowStyle Normal
     }
 }
 catch {

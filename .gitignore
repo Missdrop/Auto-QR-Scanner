@@ -17,8 +17,12 @@ Thumbs.db
 .DS_Store
 .ruff_cache/
 .pytest_cache/
+build/
+dist/
+*.egg-info/
 tmp/
 
 # Local agent instructions are not repository content.
 AGENTS.md
 agent.md
+website_adapters/

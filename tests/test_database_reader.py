@@ -4,7 +4,7 @@ from pathlib import Path
 from queue import Queue
 from unittest.mock import Mock, patch
 
-from src.database_reader import DatabaseReader
+from wechat.database_reader import DatabaseReader
 
 
 class DatabaseReaderTest(unittest.TestCase):
@@ -17,7 +17,10 @@ class DatabaseReaderTest(unittest.TestCase):
             photo.id = "one"
             output = Mock()
             reader = DatabaseReader(root / "images", output, Mock())
-            with patch("src.database_reader.shutil.copyfile", side_effect=OSError):
+            with patch(
+                "wechat.database_reader.shutil.copyfile",
+                side_effect=OSError,
+            ):
                 with self.assertRaises(OSError):
                     reader._deliver_source("Chat", photo, image, "one:compressed")
             reader._deliver_source("Chat", photo, image, "one:compressed")
@@ -50,8 +53,11 @@ class DatabaseReaderTest(unittest.TestCase):
         reader = DatabaseReader(Path("unused/images"), output, stopped)
         reader._image_modes = ["compressed"]
         with (
-            patch("src.database_reader.DatabaseSource", return_value=source),
-            patch("src.database_reader.monotonic", side_effect=[0, 61]),
+            patch(
+                "wechat.database_reader.DatabaseSource",
+                return_value=source,
+            ),
+            patch("wechat.database_reader.monotonic", side_effect=[0, 61]),
         ):
             reader.run(["Chat"], True)
         notices = [call.args[0][1] for call in output.put.call_args_list]
@@ -103,7 +109,10 @@ class DatabaseReaderTest(unittest.TestCase):
             stopped.wait.side_effect = [False, False, False, True]
             stopped.is_set.return_value = False
             reader = DatabaseReader(root / "images", output, stopped)
-            with patch("src.database_reader.DatabaseSource", return_value=source):
+            with patch(
+                "wechat.database_reader.DatabaseSource",
+                return_value=source,
+            ):
                 reader.run(["chat"], False)
             images = [
                 call.args[0][1]
@@ -137,7 +146,10 @@ class DatabaseReaderTest(unittest.TestCase):
             stopped.wait.side_effect = [False, False, True]
             stopped.is_set.return_value = False
             reader = DatabaseReader(root / "images", output, stopped)
-            with patch("src.database_reader.DatabaseSource", return_value=source):
+            with patch(
+                "wechat.database_reader.DatabaseSource",
+                return_value=source,
+            ):
                 reader.run(["Chat"], False)
             delivered = [
                 call.args[0][1]
@@ -159,7 +171,10 @@ class DatabaseReaderTest(unittest.TestCase):
         source.latest.return_value = [photo]
         reader = DatabaseReader(Path("unused/images"), Mock(), Mock())
         with (
-            patch("src.database_reader.DatabaseSource", return_value=source),
+            patch(
+                "wechat.database_reader.DatabaseSource",
+                return_value=source,
+            ),
             patch.object(reader, "deliver") as deliver,
         ):
             reader.run(["Chat"], True)
