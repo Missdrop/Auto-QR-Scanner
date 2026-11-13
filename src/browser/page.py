@@ -26,7 +26,7 @@ class BrowserPage:
             )
             try:
                 page = context.pages[0] if context.pages else context.new_page()
-                result = adapter.execute(page, url)
+                result = adapter.process(page, url)
                 if not isinstance(result, AdapterResult):
                     raise ValueError("Invalid website adapter result")
                 return AdapterResult(result.result, result.details)

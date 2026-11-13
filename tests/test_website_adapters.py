@@ -17,15 +17,14 @@ class WebsiteAdaptersTest(unittest.TestCase):
             (site / "adapter.py").write_text(
                 "from __future__ import annotations\n"
                 "from dataclasses import dataclass\n"
-                "from adapters.base import WebsiteAdapter\n"
+                "from adapters.base import WebsiteAdapter, AdapterResult\n"
                 "@dataclass\n"
                 "class Response:\n"
                 "    title: str\n"
                 "class Adapter(WebsiteAdapter):\n"
                 "    def matches(self, url): return True\n"
-                "    def process(self, page, url): return Response('Accepted')\n"
-                "    def get_result(self, response): return response.title\n"
-                "    def get_details(self, response): return ''\n"
+                "    def process(self, page, url):\n"
+                "        return AdapterResult(Response('Accepted').title)\n"
             )
             registry = WebsiteAdapters(Path(directory))
             self.assertEqual(registry.information()[0]["status"], "loaded")
@@ -51,9 +50,8 @@ class WebsiteAdaptersTest(unittest.TestCase):
                 "    version = '1.0'\n"
                 "    description = 'Example description'\n"
                 "    def matches(self, url): return True\n"
-                "    def process(self, page, url): return {}\n"
-                "    def get_result(self, response): return 'Completed'\n"
-                "    def get_details(self, response): return 'Accepted'\n"
+                "    def process(self, page, url):\n"
+                "        return AdapterResult('Completed', 'Accepted')\n"
             )
             (bad / "adapter.py").write_text("raise ValueError('private data')")
             registry = WebsiteAdapters(root)
@@ -114,9 +112,7 @@ class WebsiteAdaptersTest(unittest.TestCase):
                 "    def matches(self, url):\n"
                 "        return urlsplit(url).hostname == 'example.com'\n"
                 "    def process(self, page, url):\n"
-                "        return {}\n"
-                "    def get_result(self, response): return 'Completed'\n"
-                "    def get_details(self, response): return 'Accepted'\n"
+                "        return AdapterResult('Completed', 'Accepted')\n"
             )
             registry = WebsiteAdapters(root)
             adapter = registry.find("https://example.com/path")

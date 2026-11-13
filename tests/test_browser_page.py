@@ -6,16 +6,37 @@ from unittest.mock import Mock, patch
 
 from playwright.sync_api import sync_playwright
 
+from adapters.base import AdapterResult
 from browser.page import BrowserPage
 from browser.runtime import Chromium
 
 
 class BrowserPageTest(unittest.TestCase):
+    def test_processing_calls_adapter_once_and_returns_its_presentation(self):
+        context = Mock()
+        context.pages = [Mock()]
+        adapter = Mock()
+        adapter.process.return_value = AdapterResult("Completed", "Accepted")
+        with (
+            patch("browser.page.sync_playwright") as runtime,
+            patch("browser.page.Chromium.executable", return_value=Path("runtime.exe")),
+        ):
+            engine = runtime.return_value.__enter__.return_value.chromium
+            engine.launch_persistent_context.return_value = context
+            result = BrowserPage(Path("unused")).process(
+                "https://example.com/", adapter
+            )
+        adapter.process.assert_called_once_with(
+            context.pages[0], "https://example.com/"
+        )
+        self.assertEqual((result.result, result.details), ("Completed", "Accepted"))
+        context.close.assert_called_once()
+
     def test_invalid_adapter_result_closes_the_browser_context(self):
         context = Mock()
         context.pages = [Mock()]
         adapter = Mock()
-        adapter.execute.return_value = (True, "Invalid result")
+        adapter.process.return_value = (True, "Invalid result")
         with (
             patch("browser.page.sync_playwright") as runtime,
             patch(

@@ -42,7 +42,7 @@
 
 ```python
 from urllib.parse import urlsplit
-from adapters.base import WebsiteAdapter
+from adapters.base import AdapterResult, WebsiteAdapter
 
 
 class Adapter(WebsiteAdapter):
@@ -52,20 +52,20 @@ class Adapter(WebsiteAdapter):
     def matches(self, url: str) -> bool:
         return urlsplit(url).hostname == "example.com"
 
-    def process(self, page, url: str) -> object:
-        # page is a Playwright page with the saved browser login.
-        raise NotImplementedError("Implement website processing here")
-
-    def get_result(self, response: object) -> str:
-        return "Result text"
-
-    def get_details(self, response: object) -> str:
-        return "Details text"
+    def process(self, page, url: str) -> AdapterResult:
+        # Use the saved browser login; interpret the actual website response.
+        page.goto(url)
+        return AdapterResult(result="已打开页面", details=page.title())
 ```
 
-必须继承 `WebsiteAdapter` 并实现四个方法：`matches` 匹配网址，`process` 返回网站原始响应，`get_result` 和 `get_details` 从响应中提取扫码结果与详情。基类只执行一次 `process`，两个提取方法共享同一份响应。未匹配适配器时只打开链接，不判断网站业务结果。
+必须继承 `WebsiteAdapter` 并实现两个方法：`matches` 匹配网址，`process` 完成网页处理并返回 `AdapterResult`。示例只打开页面，业务结果应根据网站实际响应判断。未匹配适配器时只打开链接，不判断网站业务结果。
 
-`process` 可以返回字典、列表或自定义对象；两个提取方法接收这个返回值，并分别返回结果字符串和详情字符串。
+使用 `AdapterResult(result="结果文字", details="详情文字")` 构建返回值：
+
+- `result`：必填字符串，不能全为空白，最多 200 个字符，显示在“扫码结果”。
+- `details`：可选字符串，默认 `""`，最多 4000 个字符，显示在“详情”。
+
+字段无效会抛出 `ValueError`。`process` 必须返回 `AdapterResult`，不能直接返回字典、字符串或布尔值。
 
 适配器名称使用文件夹名；可选的 `version`、`description` 会显示在“查看适配器”窗口中。
 
