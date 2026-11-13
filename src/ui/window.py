@@ -20,13 +20,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .adapter_dialog import AdapterDialog
-from .address_filter import AddressFilter
-from .conversation_input import ConversationInput
-from .details import Details
-from .language import chinese
-from .outcome import Outcome
-from .result import ScanResult
+from browser.address_filter import AddressFilter
+from models.outcome import Outcome
+from models.result import ScanResult
+from ui.adapter_dialog import AdapterDialog
+from ui.conversation_input import ConversationInput
+from ui.details import Details
+from ui.language import chinese
 
 
 class Window(QMainWindow):
@@ -57,7 +57,7 @@ class Window(QMainWindow):
         )
         self.setWindowTitle("Auto QR Scanner")
         self.setWindowIcon(
-            QIcon(str(Path(__file__).resolve().parent.parent / "assets/logo.ico"))
+            QIcon(str(Path(__file__).resolve().parents[2] / "assets/logo.ico"))
         )
         self.resize(1240, 920)
 

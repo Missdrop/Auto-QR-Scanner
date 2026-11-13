@@ -4,9 +4,9 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
-from .message import ImageMessage
-from .outcome import Outcome
-from .result import Code, ScanResult
+from models.message import ImageMessage
+from models.outcome import Outcome
+from models.result import Code, ScanResult
 
 
 class History:

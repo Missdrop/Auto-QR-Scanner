@@ -2,8 +2,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.history import History
-from src.outcome import Outcome
+from models.outcome import Outcome
+from storage.history import History
 
 
 class OutcomeTest(unittest.TestCase):

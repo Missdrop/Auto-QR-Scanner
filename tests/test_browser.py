@@ -2,20 +2,21 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from src.adapter import AdapterResult
-from src.browser import Browser
+from adapters.base import AdapterResult
+from browser.client import Browser
 
 
 class BrowserTest(unittest.TestCase):
     def setUp(self):
         runtime = patch(
-            "src.browser.Chromium.executable", return_value=Path("runtime.exe")
+            "browser.client.Chromium.executable",
+            return_value=Path("runtime.exe"),
         )
         runtime.start()
         self.addCleanup(runtime.stop)
 
     def test_login_process_does_not_receive_credentials_in_arguments(self):
-        with patch("src.browser.subprocess.Popen") as start:
+        with patch("browser.client.subprocess.Popen") as start:
             browser = Browser(Path("data/session"))
             self.assertTrue(browser.open("https://example.com/qr/"))
         arguments = start.call_args.args[0]
@@ -27,7 +28,7 @@ class BrowserTest(unittest.TestCase):
         )
 
     def test_repeated_windows_share_the_same_persistent_profile(self):
-        with patch("src.browser.subprocess.Popen") as start:
+        with patch("browser.client.subprocess.Popen") as start:
             start.return_value.poll.return_value = None
             browser = Browser(Path("data/session"))
             browser.open()
@@ -36,7 +37,7 @@ class BrowserTest(unittest.TestCase):
         self.assertEqual(start.call_args_list[0].args, start.call_args_list[1].args)
 
     def test_active_login_cannot_share_its_profile_with_qr_processing(self):
-        with patch("src.browser.subprocess.Popen") as start:
+        with patch("browser.client.subprocess.Popen") as start:
             start.return_value.poll.return_value = None
             browser = Browser(Path("data/session"))
             browser.open("https://example.com/qr/")
@@ -44,7 +45,7 @@ class BrowserTest(unittest.TestCase):
                 browser.process("https://example.com/qr", object())
 
     def test_qr_processing_delegates_to_chromium_without_a_token_argument(self):
-        with patch("src.browser.BrowserPage") as page:
+        with patch("browser.client.BrowserPage") as page:
             result = AdapterResult("Custom result", "Description")
             page.return_value.process.return_value = result
             browser = Browser(Path("data/session"))

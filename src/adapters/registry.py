@@ -1,7 +1,7 @@
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
-from .adapter import WebsiteAdapter
+from adapters.base import WebsiteAdapter
 
 
 class WebsiteAdapters:

@@ -9,8 +9,8 @@ from time import monotonic
 from typing import Any
 from uuid import uuid4
 
-from .database_source import DatabasePhoto, DatabaseSource
-from .message import ImageMessage
+from models.message import ImageMessage
+from wechat.database_source import DatabasePhoto, DatabaseSource
 
 
 class DatabaseReader:

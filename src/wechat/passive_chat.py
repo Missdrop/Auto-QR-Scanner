@@ -8,7 +8,7 @@ import numpy as np
 import uiautomation
 import win32gui
 
-from .qt_access import QtAccess
+from wechat.qt_access import QtAccess
 
 
 class Photo:

@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock
 
-from src.adapter import AdapterResult, WebsiteAdapter
+from adapters.base import AdapterResult, WebsiteAdapter
 
 
 class AdapterTest(unittest.TestCase):

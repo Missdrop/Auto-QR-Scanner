@@ -5,7 +5,10 @@ from unittest.mock import Mock, patch
 
 from PySide6.QtWidgets import QApplication
 
-from src.conversation_search import ConversationSearch, contact_candidates
+from wechat.conversation_search import (
+    ConversationSearch,
+    contact_candidates,
+)
 
 
 class ConversationSearchTest(unittest.TestCase):
@@ -28,7 +31,7 @@ class ConversationSearchTest(unittest.TestCase):
         context = Mock()
         try:
             with patch(
-                "src.conversation_search.multiprocessing.get_context",
+                "wechat.conversation_search.multiprocessing.get_context",
                 return_value=context,
             ):
                 search.request("24")

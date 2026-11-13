@@ -1,4 +1,4 @@
-from .message import ImageMessage
+from models.message import ImageMessage
 
 
 class Code:

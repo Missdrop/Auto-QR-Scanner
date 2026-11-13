@@ -2,7 +2,7 @@ import importlib
 from pathlib import Path
 from typing import Any
 
-from .image_keys import ImageKeys
+from wechat.image_keys import ImageKeys
 
 
 class DatabasePhoto:

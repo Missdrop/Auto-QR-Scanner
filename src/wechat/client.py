@@ -9,7 +9,7 @@ from threading import Event, Thread
 from typing import Any
 from uuid import uuid4
 
-from .message import ImageMessage
+from models.message import ImageMessage
 
 
 class WeChat:
@@ -76,7 +76,7 @@ class WeChat:
         notify: Callable[[str], None],
         latest_only: bool = False,
     ) -> None:
-        from .database_reader import read_database
+        from wechat.database_reader import read_database
 
         context = multiprocessing.get_context("spawn")
         output = context.Queue(maxsize=128)
@@ -147,7 +147,7 @@ class WeChat:
         try:
             com = importlib.import_module("pythoncom")
             com.CoInitialize()
-            from .qt_access import QtAccess
+            from wechat.qt_access import QtAccess
 
             accessibility = QtAccess()
             accessibility.enable(notify)
@@ -221,7 +221,7 @@ class WeChat:
             raise ValueError("The free backend supports one group at a time")
         name = names[0]
         client.ChatWith(name, exact=True)
-        from .passive_chat import PassiveChat
+        from wechat.passive_chat import PassiveChat
 
         reader = PassiveChat(client, self._image_directory, notify)
         if reader.name() != name:

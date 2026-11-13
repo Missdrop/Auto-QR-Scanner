@@ -14,9 +14,7 @@ class Chromium:
     """
 
     def __init__(self, directory: Path | None = None) -> None:
-        self.directory = (
-            directory or Path(__file__).resolve().parent.parent / ".runtimes"
-        )
+        self.directory = directory or Path(__file__).resolve().parents[2] / ".runtimes"
 
     @staticmethod
     def revision() -> str:
@@ -32,11 +30,13 @@ class Chromium:
         manifest_path = self.directory / "manifest.json"
         if not manifest_path.is_file():
             raise FileNotFoundError(
-                "Run uv run python -m src.runtime to install Chromium"
+                "Run uv run python -m browser.runtime to install Chromium"
             )
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if manifest.get("revision") != self.revision():
-            raise ValueError("Chromium changed; run uv run python -m src.runtime again")
+            raise ValueError(
+                "Chromium changed; run uv run python -m browser.runtime again"
+            )
         path = (self.directory / manifest["executable"]).resolve()
         if not path.is_relative_to(self.directory.resolve()) or not path.is_file():
             raise ValueError("The Chromium runtime path is invalid")

@@ -7,16 +7,16 @@ from PySide6.QtCore import QObject, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication
 
-from .browser_session import BrowserSession
-from .conversation_search import ConversationSearch
-from .history import History
-from .message import ImageMessage
-from .outcome import Outcome
-from .result import ScanResult
-from .scanner import Scanner
-from .wechat import WeChat
-from .window import Window
-from .worker import Worker
+from application.worker import Worker
+from browser.session import BrowserSession
+from models.message import ImageMessage
+from models.outcome import Outcome
+from models.result import ScanResult
+from scanning.scanner import Scanner
+from storage.history import History
+from ui.window import Window
+from wechat.client import WeChat
+from wechat.conversation_search import ConversationSearch
 
 
 class App(QObject):

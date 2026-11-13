@@ -13,9 +13,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .language import chinese
-from .outcome import Outcome
-from .result import ScanResult
+from models.outcome import Outcome
+from models.result import ScanResult
+from ui.language import chinese
 
 
 class ImagePreview(QLabel):

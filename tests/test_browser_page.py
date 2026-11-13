@@ -6,8 +6,8 @@ from unittest.mock import Mock, patch
 
 from playwright.sync_api import sync_playwright
 
-from src.browser_page import BrowserPage
-from src.runtime import Chromium
+from browser.page import BrowserPage
+from browser.runtime import Chromium
 
 
 class BrowserPageTest(unittest.TestCase):
@@ -17,9 +17,10 @@ class BrowserPageTest(unittest.TestCase):
         adapter = Mock()
         adapter.execute.return_value = (True, "Invalid result")
         with (
-            patch("src.browser_page.sync_playwright") as runtime,
+            patch("browser.page.sync_playwright") as runtime,
             patch(
-                "src.browser_page.Chromium.executable", return_value=Path("runtime.exe")
+                "browser.page.Chromium.executable",
+                return_value=Path("runtime.exe"),
             ),
         ):
             engine = runtime.return_value.__enter__.return_value.chromium

@@ -4,9 +4,9 @@ from pathlib import Path
 from threading import Event
 from unittest.mock import Mock, patch
 
-from src.adapter import AdapterResult
-from src.browser_session import BrowserSession
-from src.website_adapters import WebsiteAdapters
+from adapters.base import AdapterResult
+from adapters.registry import WebsiteAdapters
+from browser.session import BrowserSession
 
 
 class WebsiteAdaptersTest(unittest.TestCase):
@@ -17,7 +17,7 @@ class WebsiteAdaptersTest(unittest.TestCase):
             good.mkdir()
             bad.mkdir()
             (good / "adapter.py").write_text(
-                "from src.adapter import WebsiteAdapter, AdapterResult\n"
+                "from adapters.base import WebsiteAdapter, AdapterResult\n"
                 "class Adapter(WebsiteAdapter):\n"
                 "    name = 'Example adapter'\n"
                 "    version = '1.0'\n"
@@ -81,7 +81,7 @@ class WebsiteAdaptersTest(unittest.TestCase):
             site.mkdir()
             (site / "adapter.py").write_text(
                 "from urllib.parse import urlsplit\n"
-                "from src.adapter import WebsiteAdapter, AdapterResult\n"
+                "from adapters.base import WebsiteAdapter, AdapterResult\n"
                 "class Adapter(WebsiteAdapter):\n"
                 "    def matches(self, url):\n"
                 "        return urlsplit(url).hostname == 'example.com'\n"

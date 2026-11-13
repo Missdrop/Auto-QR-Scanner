@@ -8,16 +8,30 @@
 
 ```powershell
 uv sync --locked --extra wechat
-uv run --extra wechat python -m src.runtime --ensure
-uv run --extra wechat python -m src
+uv run --extra wechat python -m browser.runtime --ensure
+uv run --extra wechat python src/main.py
 ```
 
 启动脚本位于 `scripts`。Chromium 使用项目固定版本，不使用日常浏览器的资料，也不使用 Chrome for Testing 替代。
 
+## 目录结构
+
+`src` 只是源码目录，`src/main.py` 是唯一主入口，各功能目录是独立子包。
+
+- `src/application`：任务调度和应用流程。
+- `src/ui`：主窗口、详情、对话框和主题。
+- `src/wechat`：后台消息、联系人和图片缓存读取。
+- `src/scanning`：图片预处理和二维码识别。
+- `src/browser`：Chromium、会话和地址过滤。
+- `src/adapters`：公开的适配器基类和加载器。
+- `src/models`、`src/storage`：数据模型和本机存储。
+
+具体网站适配仍只放在不提交的 `website_adapters` 目录。
+
 仅识别本地图片，不打开链接：
 
 ```powershell
-uv run python -m src --scan "C:\photos\example.jpg"
+uv run python src/main.py --scan "C:\photos\example.jpg"
 ```
 
 可用 `--data "D:\AutoQRData"` 指定数据目录。

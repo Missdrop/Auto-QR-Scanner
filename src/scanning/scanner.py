@@ -4,9 +4,9 @@ from time import perf_counter
 import cv2
 import zxingcpp
 
-from .image_processor import ImageProcessor
-from .message import ImageMessage
-from .result import Code, ScanResult
+from models.message import ImageMessage
+from models.result import Code, ScanResult
+from scanning.image_processor import ImageProcessor
 
 
 class Scanner:

@@ -2,10 +2,10 @@ from collections.abc import Callable
 from queue import Empty, Full, Queue
 from threading import Event, Thread
 
-from .history import History
-from .message import ImageMessage
-from .result import ScanResult
-from .scanner import Scanner
+from models.message import ImageMessage
+from models.result import ScanResult
+from scanning.scanner import Scanner
+from storage.history import History
 
 
 class Worker:

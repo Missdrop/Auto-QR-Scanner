@@ -4,9 +4,9 @@ from pathlib import Path
 from threading import Lock, Thread
 from urllib.parse import urlsplit
 
-from .browser import Browser
-from .outcome import Outcome
-from .website_adapters import WebsiteAdapter, WebsiteAdapters
+from adapters.registry import WebsiteAdapter, WebsiteAdapters
+from browser.client import Browser
+from models.outcome import Outcome
 
 
 class BrowserSession:
@@ -22,7 +22,7 @@ class BrowserSession:
         self._outcome = outcome or (lambda result: None)
         self._browser = Browser(directory)
         self._adapters = WebsiteAdapters(
-            Path(__file__).resolve().parent.parent / "website_adapters"
+            Path(__file__).resolve().parents[2] / "website_adapters"
         )
         self._processing = Lock()
         self._queue_lock = Lock()

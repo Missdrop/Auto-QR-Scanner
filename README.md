@@ -42,7 +42,7 @@
 
 ```python
 from urllib.parse import urlsplit
-from src.adapter import WebsiteAdapter
+from adapters.base import WebsiteAdapter
 
 
 class Adapter(WebsiteAdapter):

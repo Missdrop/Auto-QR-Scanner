@@ -6,7 +6,7 @@ from typing import Any
 
 import psutil
 
-from .secret_store import SecretStore
+from storage.secret_store import SecretStore
 
 
 class ImageKeys:

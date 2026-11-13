@@ -5,9 +5,9 @@ from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
-from src.history import History
-from src.message import ImageMessage
-from src.result import Code, ScanResult
+from models.message import ImageMessage
+from models.result import Code, ScanResult
+from storage.history import History
 
 
 class HistoryTest(unittest.TestCase):

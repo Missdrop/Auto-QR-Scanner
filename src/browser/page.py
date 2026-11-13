@@ -2,9 +2,9 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-from .adapter import AdapterResult
-from .runtime import Chromium
-from .website_adapters import WebsiteAdapter
+from adapters.base import AdapterResult
+from adapters.registry import WebsiteAdapter
+from browser.runtime import Chromium
 
 
 class BrowserPage:

@@ -5,12 +5,12 @@ from pathlib import Path
 from threading import Event
 from unittest.mock import Mock
 
-from src.history import History
-from src.image_processor import ImageProcessor
-from src.message import ImageMessage
-from src.result import Code, ScanResult
-from src.scanner import Scanner
-from src.worker import Worker
+from application.worker import Worker
+from models.message import ImageMessage
+from models.result import Code, ScanResult
+from scanning.image_processor import ImageProcessor
+from scanning.scanner import Scanner
+from storage.history import History
 
 
 class WorkerTest(unittest.TestCase):

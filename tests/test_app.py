@@ -12,16 +12,16 @@ import zxingcpp
 from PySide6.QtCore import QSettings, QTimer
 from PySide6.QtWidgets import QApplication
 
-from src.app import App
-from src.history import History
-from src.image_processor import ImageProcessor
-from src.message import ImageMessage
-from src.outcome import Outcome
-from src.result import Code, ScanResult
-from src.scanner import Scanner
-from src.website_adapters import WebsiteAdapters
-from src.wechat import WeChat
-from src.window import Window
+from adapters.registry import WebsiteAdapters
+from application.controller import App
+from models.message import ImageMessage
+from models.outcome import Outcome
+from models.result import Code, ScanResult
+from scanning.image_processor import ImageProcessor
+from scanning.scanner import Scanner
+from storage.history import History
+from ui.window import Window
+from wechat.client import WeChat
 
 
 class AppTest(unittest.TestCase):

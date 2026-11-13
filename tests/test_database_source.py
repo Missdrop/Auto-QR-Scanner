@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock
 
-from src.database_source import DatabasePhoto, DatabaseSource
+from wechat.database_source import DatabasePhoto, DatabaseSource
 
 
 class DatabaseSourceTest(unittest.TestCase):

@@ -5,10 +5,10 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
-from .history import History
-from .image_processor import ImageProcessor
-from .message import ImageMessage
-from .scanner import Scanner
+from models.message import ImageMessage
+from scanning.image_processor import ImageProcessor
+from scanning.scanner import Scanner
+from storage.history import History
 
 
 def main() -> int:
@@ -31,10 +31,10 @@ def main() -> int:
     # Import desktop modules only when a window is requested.
     from PySide6.QtWidgets import QApplication
 
-    from .app import App
-    from .theme import apply_theme
-    from .wechat import WeChat
-    from .window import Window
+    from application.controller import App
+    from ui.theme import apply_theme
+    from ui.window import Window
+    from wechat.client import WeChat
 
     application = QApplication(sys.argv[:1])
     apply_theme(application)

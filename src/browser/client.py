@@ -2,10 +2,10 @@ import subprocess
 from pathlib import Path
 from threading import Thread
 
-from .adapter import AdapterResult
-from .browser_page import BrowserPage
-from .runtime import Chromium
-from .website_adapters import WebsiteAdapter
+from adapters.base import AdapterResult
+from adapters.registry import WebsiteAdapter
+from browser.page import BrowserPage
+from browser.runtime import Chromium
 
 
 class Browser:
@@ -30,7 +30,7 @@ class Browser:
                 "--no-default-browser-check",
                 url,
             ],
-            cwd=Path(__file__).resolve().parent.parent,
+            cwd=Path(__file__).resolve().parents[2],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

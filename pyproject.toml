@@ -1,3 +1,14 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = false
+
+[tool.setuptools.package-data]
+browser = ["chromium.json"]
+
 [project]
 name = "auto-qr-scanner"
 version = "0.1.0"
@@ -37,6 +48,7 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pyrefly]
 project-includes = ["src"]
+search-path = ["src"]
 
 [tool.uv]
 override-dependencies = ["python-snappy>=0.7.3,<1", "zstd==1.5.7.2"]
