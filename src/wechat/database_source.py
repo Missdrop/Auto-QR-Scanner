@@ -37,9 +37,10 @@ class DatabaseSource:
     def __init__(self, directory: Path, images: Path) -> None:
         directory.mkdir(parents=True, exist_ok=True)
         module = importlib.import_module("wechatauto.db")
-        media = importlib.import_module("wechatauto.media")
+        from wechat.cached_media import CachedMedia
+
         self.db = module.WeChatDB(workdir=str(directory))
-        self.media = media.MediaDownloader(self.db, save_dir=str(images))
+        self.media = CachedMedia(self.db, save_dir=str(images))
         self._keys = ImageKeys(directory / "image-key.bin")
         self.thumbnail_only = False
         self.image_mode = "compressed"
@@ -90,7 +91,10 @@ class DatabaseSource:
         )
         if not raw:
             raise ValueError("The image message is no longer available")
-        files = self.media._image_files(user, self.media._img_md5(raw))
+        image_id = self.media._img_md5(raw)
+        if image_id is None:
+            raise FileNotFoundError("The image cache identifier is unavailable")
+        files = self.media._image_files(user, image_id)
         target = files.get(tier)
         if not target:
             raise FileNotFoundError("WeChat has not cached this image yet")
