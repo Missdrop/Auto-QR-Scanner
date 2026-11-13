@@ -6,7 +6,9 @@
 
 需要 **Windows 10/11 64 位**，微信需保持登录。
 
-下载并解压仓库，双击 **[scripts/start.cmd](scripts/start.cmd)** 即可启动。首次启动需要联网，程序会自动下载运行环境和 Chromium。
+点击 **[下载最新版本](https://github.com/Missdrop/Auto-QR-Scanner/releases/latest)**，在页面底部下载 **Source code (zip)**。解压后双击 **[scripts/start.cmd](scripts/start.cmd)** 即可启动。
+
+首次启动需要联网，程序会自动下载运行环境和 Chromium。
 
 启动失败时，查看 `data/startup.log`。
 
