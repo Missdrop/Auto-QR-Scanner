@@ -68,10 +68,6 @@ uv run --extra wechat python -W error::ResourceWarning -m unittest discover -s t
 
 不要提交私人图片、聊天数据库、密钥、浏览器资料、网站适配器、运行时和诊断输出。`data/wechat` 可能包含明文消息数据库；Chromium 登录资料也属于私人数据。
 
-## 发布
-
-将改动合并到 `main` 后，在该分支的提交上打标签并推送，例如 `v1.0.0`。GitHub Actions 会自动创建同名 Release 和更新说明，下载文件使用 GitHub 提供的源码压缩包。其他分支独有提交上的标签不会发布。
-
 ## 实现约定
 
 - 图片识别在本地完成，网页处理使用独立 Chromium。登录资料由浏览器保存，不将凭证写入 URL。
