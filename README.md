@@ -65,12 +65,14 @@ class Adapter(WebsiteAdapter):
 
 必须继承 `WebsiteAdapter` 并实现四个方法：`matches` 匹配网址，`process` 返回网站原始响应，`get_result` 和 `get_details` 从响应中提取扫码结果与详情。基类只执行一次 `process`，两个提取方法共享同一份响应。未匹配适配器时只打开链接，不判断网站业务结果。
 
+`process` 可以返回字典、列表或自定义对象；两个提取方法接收这个返回值，并分别返回结果字符串和详情字符串。
+
 适配器名称使用文件夹名；可选的 `version`、`description` 会显示在“查看适配器”窗口中。
 
 ## 贡献与许可
 
 开发和贡献说明见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-本项目采用 [GNU GPL v3.0](LICENSE)。第三方组件保留各自的许可证，详见 [THIRD_PARTY.md](THIRD_PARTY.md)。
+第三方组件保留各自的许可证，详见 [THIRD_PARTY.md](THIRD_PARTY.md)。
 
 Copyright © 2026 Missdrop · [GNU GPL v3.0](LICENSE)
