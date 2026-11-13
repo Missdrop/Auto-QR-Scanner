@@ -73,11 +73,10 @@ class Details(QWidget):
         self.content.setMaximumHeight(65)
         form.addRow("二维码内容", self.content)
         self._outcome = self._field(form, "扫码结果")
-        self._code = self._field(form, "返回码")
         self._message = QPlainTextEdit()
         self._message.setReadOnly(True)
         self._message.setMaximumHeight(65)
-        form.addRow("原始提示", self._message)
+        form.addRow("详情", self._message)
         self._warning = QLabel()
         self._warning.setWordWrap(True)
         form.addRow("识别提示", self._warning)
@@ -109,11 +108,8 @@ class Details(QWidget):
     ) -> None:
         self._status.setText(chinese(result.status()))
         self.content.setPlainText(text)
-        self._outcome.setText(outcome.label() if outcome else "未提交")
-        self._code.setText(
-            str(outcome.code) if outcome and outcome.code is not None else "—"
-        )
-        self._message.setPlainText(outcome.message if outcome else "")
+        self._outcome.setText(outcome.label() if outcome else "未打开")
+        self._message.setPlainText(outcome.details if outcome else "")
         self._warning.setText(
             "\n".join(
                 chinese(value) for value in (result.error, result.warning) if value

@@ -15,7 +15,7 @@ class BrowserPageTest(unittest.TestCase):
         context = Mock()
         context.pages = [Mock()]
         adapter = Mock()
-        adapter.process.return_value = (True, "Invalid result")
+        adapter.execute.return_value = (True, "Invalid result")
         with (
             patch("src.browser_page.sync_playwright") as runtime,
             patch(

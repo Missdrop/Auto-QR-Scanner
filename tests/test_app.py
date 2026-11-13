@@ -97,7 +97,7 @@ class AppTest(unittest.TestCase):
                 self.assertEqual(history.recent()[0].codes[0].text, url)
                 outcome = history.outcome(url)
                 self.assertEqual(outcome.status, "opened")
-                self.assertIsNone(outcome.code)
+                self.assertEqual(outcome.result, "")
                 self.assertEqual(outcome.label(), "已在内置浏览器打开")
                 self.assertNotEqual(outcome.label(), "处理成功")
             finally:
@@ -175,10 +175,10 @@ class AppTest(unittest.TestCase):
                 history.save(result)
                 controller._show_result(result, False)
                 controller.platform_completed.emit(
-                    Outcome(url, "result", 1001, "Expired")
+                    Outcome(url, "result", "二维码已过期", "Expired")
                 )
                 window._table.selectRow(0)
-                self.assertEqual(window._details._code.text(), "1001")
+                self.assertEqual(window._details._outcome.text(), "二维码已过期")
                 self.assertEqual(window._details._outcome.text(), "二维码已过期")
                 self.assertEqual(window.windowTitle(), "Auto QR Scanner")
                 self.assertEqual(
@@ -190,7 +190,8 @@ class AppTest(unittest.TestCase):
                 )
                 self.assertEqual(window._session_status.text(), "二维码已过期")
                 self.assertEqual(
-                    History(root / "history.sqlite3").outcome(url).code, 1001
+                    History(root / "history.sqlite3").outcome(url).result,
+                    "二维码已过期",
                 )
             finally:
                 controller.close()
@@ -291,11 +292,11 @@ class AppTest(unittest.TestCase):
                 with patch.object(controller._session, "open") as open_browser:
                     controller._show_result(result, True)
                     self.assertEqual(open_browser.call_count, 2)
-                history.save_outcome(Outcome(blocked, "result", 0))
+                history.save_outcome(Outcome(blocked, "result", "Custom result"))
                 window._addresses.setPlainText("example.com")
                 with patch.object(controller._session, "open"):
                     controller._show_result(result, True)
-                self.assertEqual(history.outcome(blocked).code, 0)
+                self.assertEqual(history.outcome(blocked).result, "Custom result")
                 window._addresses.setPlainText("https://")
                 with patch.object(controller._wechat, "start") as start:
                     controller._start_monitoring(["Chat"])

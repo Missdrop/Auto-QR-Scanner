@@ -2,6 +2,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from src.adapter import AdapterResult
 from src.browser import Browser
 
 
@@ -44,10 +45,11 @@ class BrowserTest(unittest.TestCase):
 
     def test_qr_processing_delegates_to_chromium_without_a_token_argument(self):
         with patch("src.browser.BrowserPage") as page:
-            page.return_value.process.return_value = (1001, "Expired")
+            result = AdapterResult("Custom result", "Description")
+            page.return_value.process.return_value = result
             browser = Browser(Path("data/session"))
             self.assertEqual(
-                browser.process("https://example.com/qr", object()), (1001, "Expired")
+                browser.process("https://example.com/qr", object()), result
             )
         self.assertEqual(
             page.return_value.process.call_args.args[0], "https://example.com/qr"

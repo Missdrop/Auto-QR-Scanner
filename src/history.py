@@ -46,6 +46,15 @@ class History:
             """)
 
         with self._connect() as connection:
+            outcome_columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(outcomes)")
+            }
+            if "result" not in outcome_columns:
+                connection.execute(
+                    "ALTER TABLE outcomes ADD COLUMN result TEXT NOT NULL DEFAULT ''"
+                )
+
+        with self._connect() as connection:
             columns = {row[1] for row in connection.execute("PRAGMA table_info(scans)")}
             if "warning" not in columns:
                 connection.execute(
@@ -130,10 +139,12 @@ class History:
     def save_outcome(self, outcome: Outcome) -> None:
         with self._connect() as connection:
             connection.execute(
-                "INSERT INTO outcomes VALUES (?, ?, ?, ?) ON CONFLICT(url) "
-                "DO UPDATE SET status=excluded.status, code=excluded.code, "
+                "INSERT INTO outcomes (url, status, code, message, result) "
+                "VALUES (?, ?, NULL, ?, ?) ON CONFLICT(url) "
+                "DO UPDATE SET status=excluded.status, code=NULL, "
+                "result=excluded.result, "
                 "message=excluded.message",
-                (outcome.url, outcome.status, outcome.code, outcome.message),
+                (outcome.url, outcome.status, outcome.details, outcome.result),
             )
 
     def outcomes(self) -> list[Outcome]:
@@ -141,14 +152,14 @@ class History:
             return [
                 Outcome(*row)
                 for row in connection.execute(
-                    "SELECT url, status, code, message FROM outcomes"
+                    "SELECT url, status, result, message FROM outcomes"
                 )
             ]
 
     def outcome(self, url: str) -> Outcome | None:
         with self._connect() as connection:
             row = connection.execute(
-                "SELECT url, status, code, message FROM outcomes WHERE url = ?",
+                "SELECT url, status, result, message FROM outcomes WHERE url = ?",
                 (url,),
             ).fetchone()
         return Outcome(*row) if row else None

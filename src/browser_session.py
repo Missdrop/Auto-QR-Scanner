@@ -59,7 +59,7 @@ class BrowserSession:
     def _enqueue(self, url: str, adapter: WebsiteAdapter) -> None:
         with self._queue_lock:
             if len(self._pending) >= 64:
-                self._outcome(Outcome(url, "error", message="Queue is full"))
+                self._outcome(Outcome(url, "error", details="Queue is full"))
                 self._notify("Browser queue is full; retry manually")
                 return
             self._pending.append((url, adapter))
@@ -90,17 +90,15 @@ class BrowserSession:
 
     def _process(self, url: str, adapter: WebsiteAdapter) -> None:
         try:
-            code, message = self._browser.process(url, adapter)
-            self._outcome(Outcome(url, "result", code, message))
-            if code in {401, 403}:
-                self._notify("Login required")
+            result = self._browser.process(url, adapter)
+            self._outcome(Outcome(url, "result", result.result, result.details))
         except Exception as exception:
             message = (
                 str(exception)
                 if isinstance(exception, RuntimeError)
                 else type(exception).__name__
             )
-            self._outcome(Outcome(url, "error", message=message))
+            self._outcome(Outcome(url, "error", details=message))
             self._notify(message)
 
     @staticmethod

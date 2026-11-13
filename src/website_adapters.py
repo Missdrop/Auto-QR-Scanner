@@ -1,14 +1,7 @@
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
-from typing import Protocol
 
-from playwright.sync_api import Page
-
-
-class WebsiteAdapter(Protocol):
-    def matches(self, url: str) -> bool: ...
-
-    def process(self, page: Page, url: str) -> tuple[int, str]: ...
+from .adapter import WebsiteAdapter
 
 
 class WebsiteAdapters:
@@ -56,8 +49,8 @@ class WebsiteAdapters:
                     module = module_from_spec(spec)
                     spec.loader.exec_module(module)
                     adapter = module.Adapter()
-                    if not callable(adapter.matches) or not callable(adapter.process):
-                        raise ValueError("Missing adapter methods")
+                    if not isinstance(adapter, WebsiteAdapter):
+                        raise ValueError("Adapter must inherit WebsiteAdapter")
                     for key in ("version", "description"):
                         value = getattr(adapter, key, row[key])
                         if isinstance(value, str):

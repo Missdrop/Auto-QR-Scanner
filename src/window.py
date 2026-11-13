@@ -279,7 +279,7 @@ class Window(QMainWindow):
                 ),
                 text,
                 f"{result.elapsed_ms:.0f}",
-                self._outcomes[text].label() if text in self._outcomes else "未提交",
+                self._outcomes[text].label() if text in self._outcomes else "未打开",
                 {"thumbnail": "缩略图", "original": "原图", "compressed": "压缩图"}.get(
                     result.message.image_kind, "未知"
                 ),

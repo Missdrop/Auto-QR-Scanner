@@ -1,5 +1,7 @@
+import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
@@ -9,6 +11,25 @@ from src.result import Code, ScanResult
 
 
 class HistoryTest(unittest.TestCase):
+    def test_existing_records_keep_details_without_inventing_adapter_results(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "history.sqlite3"
+            with closing(sqlite3.connect(path)) as connection:
+                connection.execute(
+                    "CREATE TABLE outcomes (url TEXT PRIMARY KEY, status TEXT, "
+                    "code INTEGER, message TEXT)"
+                )
+                connection.execute(
+                    "INSERT INTO outcomes VALUES (?, ?, ?, ?)",
+                    ("qr", "result", 0, "Existing details"),
+                )
+                connection.commit()
+            history = History(path)
+            old = history.outcome("qr")
+            self.assertEqual(old.details, "Existing details")
+            self.assertEqual(old.result, "")
+            self.assertEqual(old.label(), "已处理")
+
     def setUp(self) -> None:
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)

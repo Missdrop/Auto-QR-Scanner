@@ -42,21 +42,28 @@
 
 ```python
 from urllib.parse import urlsplit
+from src.adapter import WebsiteAdapter
 
 
-class Adapter:
+class Adapter(WebsiteAdapter):
     version = "1.0.0"
     description = "Process links from example.com"
 
     def matches(self, url: str) -> bool:
         return urlsplit(url).hostname == "example.com"
 
-    def process(self, page, url: str) -> tuple[int, str]:
+    def process(self, page, url: str) -> object:
         # page is a Playwright page with the saved browser login.
         raise NotImplementedError("Implement website processing here")
+
+    def get_result(self, response: object) -> str:
+        return "Result text"
+
+    def get_details(self, response: object) -> str:
+        return "Details text"
 ```
 
-`matches` 判断是否接管网址；`process` 使用已登录的 Chromium 页面执行操作，返回 `(结果码, 提示)`：`0` 为成功，`401/403` 为需登录，其余为未通过。未匹配适配器的网址按普通链接打开。请勿把“页面打开”当作处理成功。
+必须继承 `WebsiteAdapter` 并实现四个方法：`matches` 匹配网址，`process` 返回网站原始响应，`get_result` 和 `get_details` 从响应中提取扫码结果与详情。基类只执行一次 `process`，两个提取方法共享同一份响应。未匹配适配器时只打开链接，不判断网站业务结果。
 
 适配器名称使用文件夹名；可选的 `version`、`description` 会显示在“查看适配器”窗口中。
 

@@ -8,16 +8,10 @@ from src.outcome import Outcome
 
 class OutcomeTest(unittest.TestCase):
     def test_platform_results_are_not_confused_with_decoding(self):
-        cases = [
-            (0, "OK", "处理成功"),
-            (1001, "The QR code has expired", "二维码已过期"),
-            (1002, "Not applicable to this account", "不适用于当前账号"),
-            (1003, "You have already processed in", "已处理"),
-            (401, "Expired", "需要重新登录"),
-            (999, "Unknown platform error", "扫码未通过"),
-        ]
-        for code, message, label in cases:
-            self.assertEqual(Outcome("qr", "result", code, message).label(), label)
+        for label in ["Custom result", "Pending review", "Completed"]:
+            outcome = Outcome("qr", "result", label, "Adapter description")
+            self.assertEqual(outcome.label(), label)
+            self.assertIn("Adapter description", outcome.detail())
         self.assertEqual(Outcome("qr", "queued").label(), "等待扫码")
         self.assertNotEqual(Outcome("qr", "error").label(), "处理成功")
 
@@ -25,8 +19,10 @@ class OutcomeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "history.sqlite3"
             history = History(path)
-            history.save_outcome(Outcome("one", "result", 1001, "Expired"))
+            history.save_outcome(
+                Outcome("one", "result", "Custom result", "Description")
+            )
             history.save_outcome(Outcome("two", "processing"))
             loaded = {value.url: value for value in History(path).outcomes()}
-            self.assertEqual(loaded["one"].label(), "二维码已过期")
+            self.assertEqual(loaded["one"].label(), "Custom result")
             self.assertEqual(loaded["two"].status, "cancelled")

@@ -1,15 +1,13 @@
 class Outcome:
-    """
-    Keep an actual platform outcome separate from successful QR decoding.
-    """
+    """Keep generic processing state and adapter-authored result text."""
 
     def __init__(
-        self, url: str, status: str, code: int | None = None, message: str = ""
+        self, url: str, status: str, result: str = "", details: str = ""
     ) -> None:
         self.url = url
         self.status = status
-        self.code = code
-        self.message = message
+        self.result = result
+        self.details = details
 
     def label(self) -> str:
         states = {
@@ -17,44 +15,12 @@ class Outcome:
             "opened": "已在内置浏览器打开",
             "queued": "等待扫码",
             "processing": "正在扫码",
-            "login": "需要登录",
             "error": "处理失败，需重试",
             "cancelled": "已取消，需重试",
         }
-        if self.status in states:
-            return states[self.status]
-        if self.status != "result":
-            return "未提交"
-        if self.code == 0:
-            return "处理成功"
-        if self.code in {401, 403}:
-            return "需要重新登录"
-        message = self.message.lower()
-        if "expired" in message or "过期" in message:
-            return "二维码已过期"
-        if any(
-            value in message
-            for value in (
-                "not your",
-                "not applicable",
-                "not registered",
-                "not in this",
-                "不属于",
-                "非本人",
-                "不是你的",
-                "不是您的",
-                "不适用",
-            )
-        ):
-            return "不适用于当前账号"
-        if "already" in message and any(
-            value in message for value in ("process", "complete")
-        ):
-            return "已处理"
-        if "已处理" in message:
-            return "已处理"
-        return "扫码未通过"
+        if self.status == "result":
+            return self.result or "已处理"
+        return states.get(self.status, "未打开")
 
     def detail(self) -> str:
-        code = str(self.code) if self.code is not None else "无"
-        return f"扫码结果：{self.label()}\n返回码：{code}\n原始提示：{self.message}"
+        return f"扫码结果：{self.label()}\n详情：{self.details}"

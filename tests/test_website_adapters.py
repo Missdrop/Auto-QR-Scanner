@@ -4,6 +4,7 @@ from pathlib import Path
 from threading import Event
 from unittest.mock import Mock, patch
 
+from src.adapter import AdapterResult
 from src.browser_session import BrowserSession
 from src.website_adapters import WebsiteAdapters
 
@@ -16,12 +17,15 @@ class WebsiteAdaptersTest(unittest.TestCase):
             good.mkdir()
             bad.mkdir()
             (good / "adapter.py").write_text(
-                "class Adapter:\n"
+                "from src.adapter import WebsiteAdapter, AdapterResult\n"
+                "class Adapter(WebsiteAdapter):\n"
                 "    name = 'Example adapter'\n"
                 "    version = '1.0'\n"
                 "    description = 'Example description'\n"
                 "    def matches(self, url): return True\n"
-                "    def process(self, page, url): return 0, 'Accepted'\n"
+                "    def process(self, page, url): return {}\n"
+                "    def get_result(self, response): return 'Completed'\n"
+                "    def get_details(self, response): return 'Accepted'\n"
             )
             (bad / "adapter.py").write_text("raise ValueError('private data')")
             registry = WebsiteAdapters(root)
@@ -48,7 +52,7 @@ class WebsiteAdaptersTest(unittest.TestCase):
                     started.set()
                     released.wait(2)
                     raise ValueError("Synthetic failure")
-                return 0, "Accepted"
+                return AdapterResult("Completed", "Accepted")
 
             try:
                 with (
@@ -62,7 +66,9 @@ class WebsiteAdaptersTest(unittest.TestCase):
                     session._request_thread.join(timeout=3)
                 final = {item.url: item for item in outcomes}
                 self.assertEqual(final["https://example.com/first"].status, "error")
-                self.assertEqual(final["https://example.com/second"].code, 0)
+                self.assertEqual(
+                    final["https://example.com/second"].result, "Completed"
+                )
             finally:
                 released.set()
                 session.close()
@@ -75,11 +81,14 @@ class WebsiteAdaptersTest(unittest.TestCase):
             site.mkdir()
             (site / "adapter.py").write_text(
                 "from urllib.parse import urlsplit\n"
-                "class Adapter:\n"
+                "from src.adapter import WebsiteAdapter, AdapterResult\n"
+                "class Adapter(WebsiteAdapter):\n"
                 "    def matches(self, url):\n"
                 "        return urlsplit(url).hostname == 'example.com'\n"
                 "    def process(self, page, url):\n"
-                "        return 0, 'Accepted'\n"
+                "        return {}\n"
+                "    def get_result(self, response): return 'Completed'\n"
+                "    def get_details(self, response): return 'Accepted'\n"
             )
             registry = WebsiteAdapters(root)
             adapter = registry.find("https://example.com/path")
@@ -105,13 +114,15 @@ class WebsiteAdaptersTest(unittest.TestCase):
                 with (
                     patch.object(session._adapters, "find", return_value=adapter),
                     patch.object(
-                        session._browser, "process", return_value=(0, "Accepted")
+                        session._browser,
+                        "process",
+                        return_value=AdapterResult("Custom result", "Accepted"),
                     ) as process,
                 ):
                     session.open("https://example.com/qr")
                     session._request_thread.join(timeout=2)
                     process.assert_called_once_with("https://example.com/qr", adapter)
-                self.assertEqual(outcomes[-1].label(), "处理成功")
+                self.assertEqual(outcomes[-1].label(), "Custom result")
                 self.assertFalse((Path(directory) / "session.bin").exists())
                 self.assertFalse((Path(directory) / "login.key").exists())
             finally:
