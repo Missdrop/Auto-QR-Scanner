@@ -2,8 +2,9 @@ import subprocess
 from pathlib import Path
 from threading import Thread
 
+from .browser_page import BrowserPage
 from .runtime import Chromium
-from .student_page import StudentPage
+from .website_adapters import WebsiteAdapter
 
 
 class Browser:
@@ -41,9 +42,9 @@ class Browser:
             self._process = process
         return True
 
-    def process(self, state: str) -> tuple[int, str]:
+    def process(self, url: str, adapter: WebsiteAdapter) -> tuple[int, str]:
         if self._process is not None and self._process.poll() is None:
             raise RuntimeError(
                 "Close the built-in browser before background processing"
             )
-        return StudentPage(self._directory).process(state)
+        return BrowserPage(self._directory).process(url, adapter)

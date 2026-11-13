@@ -10,7 +10,7 @@ class Blob(ctypes.Structure):
 
 class SecretStore:
     """
-    Protect a local student session with Windows user-bound DPAPI encryption.
+    Protect a local session session with Windows user-bound DPAPI encryption.
     """
 
     def __init__(self, path: Path) -> None:

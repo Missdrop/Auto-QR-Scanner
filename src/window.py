@@ -41,7 +41,7 @@ class Window(QMainWindow):
     retry_requested = Signal(object)
     login_requested = Signal()
     image_folder_requested = Signal()
-    student_open_requested = Signal(str)
+    session_open_requested = Signal(str)
     link_open_requested = Signal(str)
     conversation_query_requested = Signal(str)
     closing = Signal()
@@ -103,8 +103,8 @@ class Window(QMainWindow):
             self._image_modes[mode] = button
             button.setChecked(mode in selected)
         self._status = QLabel("就绪")
-        self._student_status = QLabel("")
-        self._student_status.setWordWrap(True)
+        self._session_status = QLabel("")
+        self._session_status.setWordWrap(True)
         self._table = self._create_table()
         self._details = Details()
         self.setCentralWidget(self._create_layout())
@@ -159,7 +159,7 @@ class Window(QMainWindow):
         layout.addWidget(self._automatic)
         for button in self._image_modes.values():
             layout.addWidget(button)
-        layout.addWidget(self._student_status)
+        layout.addWidget(self._session_status)
 
         splitter = QSplitter(Qt.Orientation.Vertical)
         splitter.addWidget(self._table)
@@ -171,7 +171,7 @@ class Window(QMainWindow):
         actions = QHBoxLayout()
         self._button("复制内容", self._copy_content, actions)
         self._button("打开链接", self._open_link, actions)
-        self._button("重新扫码", self._open_student, actions)
+        self._button("重新扫码", self._open_session, actions)
         self._button("重新识别并处理", self._retry, actions)
         layout.addLayout(actions)
         layout.addWidget(self._status)
@@ -218,8 +218,8 @@ class Window(QMainWindow):
     def show_status(self, message: str) -> None:
         self._status.setText(chinese(message))
 
-    def show_student_status(self, message: str) -> None:
-        self._student_status.setText(chinese(message))
+    def show_session_status(self, message: str) -> None:
+        self._session_status.setText(chinese(message))
 
     def add_result(self, result: ScanResult) -> None:
         values = [code.text for code in result.codes] or [""]
@@ -250,7 +250,7 @@ class Window(QMainWindow):
 
     def show_outcome(self, outcome: Outcome) -> None:
         self._outcomes[outcome.url] = outcome
-        self._student_status.setText(outcome.label())
+        self._session_status.setText(outcome.label())
         for row, (_, text) in enumerate(self._records):
             if text == outcome.url:
                 self._table.setItem(row, 5, QTableWidgetItem(outcome.label()))
@@ -280,10 +280,10 @@ class Window(QMainWindow):
             return
         self.link_open_requested.emit(selected[1])
 
-    def _open_student(self) -> None:
+    def _open_session(self) -> None:
         selected = self._selection()
         if selected is not None and selected[1]:
-            self.student_open_requested.emit(selected[1])
+            self.session_open_requested.emit(selected[1])
 
     def _retry(self) -> None:
         selected = self._selection()

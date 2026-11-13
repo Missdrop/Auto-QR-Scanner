@@ -52,7 +52,7 @@ uv run --extra wechat python -W error::ResourceWarning -m unittest discover -s t
 3. PR 提交到 `main`，说明解决的问题、行为变化、验证结果和已知限制，只包含本次相关改动。
 4. 自动化协作者推送、创建 PR 或合并前，需要用户明确授权。
 
-不要提交私人图片、聊天数据库、密钥、浏览器资料、运行时和诊断输出。`data/wechat` 可能包含明文消息数据库；旧版会话兼容文件和 Chromium 登录资料也属于私人数据。
+不要提交私人图片、聊天数据库、密钥、浏览器资料、网站适配器、运行时和诊断输出。`data/wechat` 可能包含明文消息数据库；Chromium 登录资料也属于私人数据。
 
 ## 实现约定
 

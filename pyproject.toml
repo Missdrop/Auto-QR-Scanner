@@ -1,17 +1,16 @@
 [project]
 name = "auto-qr-scanner"
 version = "0.1.0"
+authors = [{name = "Missdrop"}]
 requires-python = ">=3.12,<3.13"
 readme = "README.md"
 license = "GPL-3.0-only"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "COPYRIGHT"]
 dependencies = [
-    "dfindexeddb==20260210",
     "numpy>=2.2,<3",
     "opencv-python>=4.11,<5",
     "playwright==1.65.1",
     "pyside6-essentials>=6.8,<6.9",
-    "zstandard>=0.23,<1",
     "zxing-cpp>=3.1.1",
 ]
 

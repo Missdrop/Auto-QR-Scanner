@@ -7,13 +7,13 @@ from PySide6.QtCore import QObject, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication
 
+from .browser_session import BrowserSession
 from .conversation_search import ConversationSearch
 from .history import History
 from .message import ImageMessage
 from .outcome import Outcome
 from .result import ScanResult
 from .scanner import Scanner
-from .student import Student
 from .wechat import WeChat
 from .window import Window
 from .worker import Worker
@@ -21,12 +21,12 @@ from .worker import Worker
 
 class App(QObject):
     """
-    Connect desktop actions to monitoring, scanning and the student browser.
+    Connect desktop actions to monitoring, scanning and the session browser.
     """
 
     completed = Signal(object, bool)
     notice = Signal(str)
-    student_notice = Signal(str)
+    session_notice = Signal(str)
     incoming = Signal(object)
     latest_incoming = Signal(object)
     platform_completed = Signal(object)
@@ -37,23 +37,23 @@ class App(QObject):
         scanner: Scanner,
         history: History,
         window: Window,
-        student_directory: Path,
+        session_directory: Path,
     ) -> None:
         super().__init__()
         self._closed = False
         self._wechat = wechat
         self._history = history
         self._window = window
-        self._image_directory = student_directory.parent / "images"
+        self._image_directory = session_directory.parent / "images"
         self._conversation_search = ConversationSearch(
-            student_directory.parent / "wechat"
+            session_directory.parent / "wechat"
         )
-        self._student = Student(
-            student_directory, self.student_notice.emit, self.platform_completed.emit
+        self._session = BrowserSession(
+            session_directory, self.session_notice.emit, self.platform_completed.emit
         )
         self._worker = Worker(scanner, history, self.completed.emit, self.notice.emit)
         self._connect_actions()
-        window.show_student_status(self._student.status())
+        window.show_session_status(self._session.status())
         for outcome in history.outcomes():
             window.show_outcome(outcome)
 
@@ -70,7 +70,7 @@ class App(QObject):
         self._conversation_search.failed.connect(self.notice.emit)
         self.completed.connect(self._show_result)
         self.notice.connect(self._show_notice)
-        self.student_notice.connect(self._show_student_notice)
+        self.session_notice.connect(self._show_session_notice)
         self.incoming.connect(self._submit_incoming)
         self.latest_incoming.connect(self._submit_incoming)
         self.platform_completed.connect(self._show_outcome)
@@ -80,7 +80,7 @@ class App(QObject):
         self._window.retry_requested.connect(self._submit_incoming)
         self._window.login_requested.connect(self._open_login)
         self._window.image_folder_requested.connect(self._open_image_folder)
-        self._window.student_open_requested.connect(self._open_student)
+        self._window.session_open_requested.connect(self._open_session)
         self._window.link_open_requested.connect(self._open_link)
         self._window.closing.connect(self.close)
 
@@ -148,7 +148,7 @@ class App(QObject):
                 self.notice.emit(str(exception))
                 return
             for code in result.codes:
-                if Student.is_web_url(code.text):
+                if BrowserSession.is_web_url(code.text):
                     previous = self._history.outcome(code.text)
                     if not addresses.allows(code.text):
                         if previous is None or previous.status == "filtered":
@@ -157,34 +157,34 @@ class App(QObject):
                     # Another image version must not replay an uncertain request.
                     # Existing attempts can be retried explicitly from the record.
                     if previous is None or previous.status == "filtered":
-                        self._open_student(code.text)
+                        self._open_session(code.text)
 
     def _show_outcome(self, outcome: Outcome) -> None:
         self._history.save_outcome(outcome)
         self._window.show_outcome(outcome)
 
-    def _show_student_notice(self, message: str) -> None:
+    def _show_session_notice(self, message: str) -> None:
         # Structured outcomes already display the precise translated result.
         if not message.startswith("Platform "):
-            self._window.show_student_status(message)
+            self._window.show_session_status(message)
 
     def _open_login(self) -> None:
         try:
-            self._student.open()
+            self._session.open()
         except (ValueError, OSError) as exception:
-            self.student_notice.emit(str(exception))
+            self.session_notice.emit(str(exception))
 
     def _open_link(self, url: str) -> None:
         try:
-            self._student.open_link(url)
+            self._session.open_link(url)
         except (ValueError, OSError) as exception:
-            self.student_notice.emit(str(exception))
+            self.session_notice.emit(str(exception))
 
-    def _open_student(self, url: str) -> None:
+    def _open_session(self, url: str) -> None:
         try:
-            self._student.open(url)
+            self._session.open(url)
         except (ValueError, OSError) as exception:
-            self.student_notice.emit(str(exception))
+            self.session_notice.emit(str(exception))
 
     def close(self) -> None:
         if self._closed:
@@ -199,4 +199,4 @@ class App(QObject):
             sleep(0.01)
         self._wechat.close()
         self._worker.close()
-        self._student.close()
+        self._session.close()

@@ -22,3 +22,4 @@ tmp/
 # Local agent instructions are not repository content.
 AGENTS.md
 agent.md
+website_adapters/

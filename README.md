@@ -38,6 +38,27 @@
 
 ## 贡献与许可
 
+### 网站适配接口
+
+在 `website_adapters/<名称>/adapter.py` 中定义 `Adapter` 类，修改后重启程序。该目录已被 Git 忽略，请只放入自己信任的代码。
+
+```python
+from urllib.parse import urlsplit
+
+
+class Adapter:
+    def matches(self, url: str) -> bool:
+        return urlsplit(url).hostname == "example.com"
+
+    def process(self, page, url: str) -> tuple[int, str]:
+        # page is a Playwright page with the saved browser login.
+        raise NotImplementedError("Implement website processing here")
+```
+
+`matches` 判断是否接管网址；`process` 使用已登录的 Chromium 页面执行操作，返回 `(结果码, 提示)`：`0` 为成功，`401/403` 为需登录，其余为未通过。未匹配适配器的网址按普通链接打开。请勿把“页面打开”当作处理成功。
+
 开发和贡献说明见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 本项目采用 [GNU GPL v3.0](LICENSE)。第三方组件保留各自的许可证，详见 [THIRD_PARTY.md](THIRD_PARTY.md)。
+
+Copyright (C) 2026 Missdrop，详见 [COPYRIGHT](COPYRIGHT)。

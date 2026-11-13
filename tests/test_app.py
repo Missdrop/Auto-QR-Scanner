@@ -19,7 +19,6 @@ from src.message import ImageMessage
 from src.outcome import Outcome
 from src.result import Code, ScanResult
 from src.scanner import Scanner
-from src.student import Student
 from src.wechat import WeChat
 from src.window import Window
 
@@ -28,17 +27,6 @@ class AppTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.application = QApplication.instance() or QApplication([])
-
-    def setUp(self) -> None:
-        start = Student.start
-        bridge = patch.object(
-            Student,
-            "start",
-            autospec=True,
-            side_effect=lambda student: start(student, 0),
-        )
-        bridge.start()
-        self.addCleanup(bridge.stop)
 
     def test_local_image_reaches_window_without_opening_browser(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -54,7 +42,6 @@ class AppTest(unittest.TestCase):
                 root / "profile",
             )
             try:
-                self.assertIsNone(controller._student._server)
                 barcode = zxingcpp.create_barcode(
                     "https://example.com", zxingcpp.BarcodeFormat.QRCode
                 )
@@ -62,7 +49,7 @@ class AppTest(unittest.TestCase):
                 cv2.imencode(".png", np.asarray(barcode.to_image(scale=5)))[1].tofile(
                     path
                 )
-                with patch.object(controller._student, "open") as open_browser:
+                with patch.object(controller._session, "open") as open_browser:
                     controller._scan_files([path])
                     deadline = time.monotonic() + 5
                     while not window._records and time.monotonic() < deadline:
@@ -101,10 +88,10 @@ class AppTest(unittest.TestCase):
                 Scanner(ImageProcessor()),
                 history,
                 window,
-                root / "student",
+                root / "session",
             )
             try:
-                url = "https://ams.xjtlu.edu.cn/studenth5/#/?state=example"
+                url = "https://example.com/qr/#/?state=example"
                 result = ScanResult(
                     ImageMessage("one", "Chat", root / "image.png", datetime.now()),
                     [Code(url)],
@@ -122,10 +109,10 @@ class AppTest(unittest.TestCase):
                     window._table.horizontalHeaderItem(5).text(), "扫码结果"
                 )
                 self.assertEqual(window._table.item(0, 5).text(), "二维码已过期")
-                controller._show_student_notice(
+                controller._show_session_notice(
                     "Platform rejected the QR code: Expired"
                 )
-                self.assertEqual(window._student_status.text(), "二维码已过期")
+                self.assertEqual(window._session_status.text(), "二维码已过期")
                 self.assertEqual(
                     History(root / "history.sqlite3").outcome(url).code, 1001
                 )
@@ -155,11 +142,11 @@ class AppTest(unittest.TestCase):
             try:
                 for status in ["error", "login", "cancelled", "queued", "result"]:
                     history.save_outcome(Outcome(url, status))
-                    with patch.object(controller._student, "open") as open_browser:
+                    with patch.object(controller._session, "open") as open_browser:
                         controller._show_result(result, True)
                         open_browser.assert_not_called()
-                with patch.object(controller._student, "open") as open_browser:
-                    controller._open_student(url)
+                with patch.object(controller._session, "open") as open_browser:
+                    controller._open_session(url)
                     open_browser.assert_called_once_with(url)
             finally:
                 controller.close()
@@ -219,18 +206,18 @@ class AppTest(unittest.TestCase):
             )
             try:
                 window._addresses.setPlainText("https://example.com/qr/")
-                with patch.object(controller._student, "open") as open_browser:
+                with patch.object(controller._session, "open") as open_browser:
                     controller._show_result(result, True)
                     open_browser.assert_called_once_with(allowed)
                 self.assertEqual(history.outcome(blocked).status, "filtered")
                 self.assertEqual(history.outcome(blocked).label(), "已被地址过滤")
                 window._addresses.clear()
-                with patch.object(controller._student, "open") as open_browser:
+                with patch.object(controller._session, "open") as open_browser:
                     controller._show_result(result, True)
                     self.assertEqual(open_browser.call_count, 2)
                 history.save_outcome(Outcome(blocked, "result", 0))
                 window._addresses.setPlainText("example.com")
-                with patch.object(controller._student, "open"):
+                with patch.object(controller._session, "open"):
                     controller._show_result(result, True)
                 self.assertEqual(history.outcome(blocked).code, 0)
                 window._addresses.setPlainText("https://")

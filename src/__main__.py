@@ -43,7 +43,7 @@ def main() -> int:
         scanner,
         History(data_directory / "history.sqlite3"),
         window,
-        data_directory / "student",
+        data_directory / "browser",
     )
     application.aboutToQuit.connect(controller.close)
     window.show()

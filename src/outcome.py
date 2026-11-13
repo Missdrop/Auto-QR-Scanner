@@ -26,7 +26,7 @@ class Outcome:
         if self.status != "result":
             return "未提交"
         if self.code == 0:
-            return "签到成功"
+            return "处理成功"
         if self.code in {401, 403}:
             return "需要重新登录"
         message = self.message.lower()
@@ -36,23 +36,23 @@ class Outcome:
             value in message
             for value in (
                 "not your",
-                "not enrolled",
+                "not applicable",
                 "not registered",
                 "not in this",
                 "不属于",
                 "非本人",
                 "不是你的",
                 "不是您的",
-                "未选修",
+                "不适用",
             )
         ):
-            return "不是我的课"
+            return "不适用于当前账号"
         if "already" in message and any(
-            value in message for value in ("sign", "check", "attend")
+            value in message for value in ("process", "complete")
         ):
-            return "已签到"
-        if "已签到" in message:
-            return "已签到"
+            return "已处理"
+        if "已处理" in message:
+            return "已处理"
         return "扫码未通过"
 
     def detail(self) -> str:
