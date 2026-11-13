@@ -61,4 +61,4 @@ class Adapter:
 
 本项目采用 [GNU GPL v3.0](LICENSE)。第三方组件保留各自的许可证，详见 [THIRD_PARTY.md](THIRD_PARTY.md)。
 
-Copyright (C) 2026 Missdrop，详见 [COPYRIGHT](COPYRIGHT)。
+Copyright © 2026 Missdrop · [GNU GPL v3.0](LICENSE)
