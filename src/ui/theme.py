@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
 
@@ -6,7 +8,9 @@ def apply_theme(application: QApplication) -> None:
     """Apply one consistent palette to windows, dialogs and completion popups."""
     application.setStyle("Fusion")
     application.setFont(QFont("Microsoft YaHei UI", 10))
-    application.setStyleSheet("""
+    check_icon = (Path(__file__).resolve().parents[2] / "assets/check.svg").as_posix()
+    application.setStyleSheet(
+        """
         QWidget { background: #111827; color: #e5eaf3; }
         QLabel { background: transparent; }
         QLabel#heading { font-size: 23px; font-weight: 600; color: #f8fafc; }
@@ -28,7 +32,13 @@ def apply_theme(application: QApplication) -> None:
         QPushButton:disabled { background: #192235; color: #64748b;
             border-color: #29364c; }
         QCheckBox { spacing: 8px; background: transparent; }
-        QCheckBox::indicator { width: 16px; height: 16px; }
+        QCheckBox::indicator { width: 18px; height: 18px;
+            border: 2px solid #71839d; border-radius: 4px; background: #1b2537; }
+        QCheckBox::indicator:hover { border-color: #93c5fd; }
+        QCheckBox::indicator:checked { background: #2563eb; border-color: #60a5fa;
+            image: url("__CHECK_ICON__"); }
+        QCheckBox::indicator:disabled { background: #192235; border-color: #3b4b63; }
+        QCheckBox::indicator:checked:disabled { background: #334b70; }
         QTableWidget, QListView { background: #172134;
             alternate-background-color: #1b273b; border: 1px solid #334155;
             border-radius: 7px; selection-background-color: #284c7c; }
@@ -44,4 +54,5 @@ def apply_theme(application: QApplication) -> None:
         QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
         QToolTip { background: #243249; color: #f1f5f9;
             border: 1px solid #475569; padding: 6px; }
-    """)
+    """.replace("__CHECK_ICON__", check_icon)
+    )
