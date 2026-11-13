@@ -79,6 +79,7 @@ class App(QObject):
         self._window.stop_requested.connect(self._wechat.stop)
         self._window.retry_requested.connect(self._submit_incoming)
         self._window.login_requested.connect(self._open_login)
+        self._window.adapters_requested.connect(self._show_adapters)
         self._window.image_folder_requested.connect(self._open_image_folder)
         self._window.session_open_requested.connect(self._open_session)
         self._window.link_open_requested.connect(self._open_link)
@@ -89,6 +90,9 @@ class App(QObject):
         QDesktopServices.openUrl(
             QUrl.fromLocalFile(str(self._image_directory.resolve()))
         )
+
+    def _show_adapters(self) -> None:
+        self._window.show_adapters(self._session.adapter_information())
 
     def _start_monitoring(self, groups: list[str]) -> None:
         try:

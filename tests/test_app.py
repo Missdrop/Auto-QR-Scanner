@@ -25,6 +25,36 @@ from src.window import Window
 
 
 class AppTest(unittest.TestCase):
+    def test_adapter_dialog_displays_information_and_reuses_its_window(self):
+        with tempfile.TemporaryDirectory() as directory:
+            window = Window(
+                QSettings(
+                    str(Path(directory) / "settings.ini"), QSettings.Format.IniFormat
+                )
+            )
+            rows = [
+                {
+                    "name": "Example adapter",
+                    "version": "1.0",
+                    "description": "Example",
+                    "status": "loaded",
+                    "path": "example/adapter.py",
+                    "error": "",
+                }
+            ]
+            try:
+                window.show_adapters(rows)
+                dialog = window._adapter_dialog
+                self.assertEqual(dialog.table.item(0, 0).text(), "Example adapter")
+                self.assertEqual(dialog.table.item(0, 3).text(), "已加载")
+                self.assertIn("example/adapter.py", dialog._details.toPlainText())
+                dialog.close()
+                window.show_adapters(rows)
+                self.assertIs(window._adapter_dialog, dialog)
+                self.assertTrue(dialog.isVisible())
+            finally:
+                window.close()
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.application = QApplication.instance() or QApplication([])

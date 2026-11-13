@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .adapter_dialog import AdapterDialog
 from .address_filter import AddressFilter
 from .conversation_input import ConversationInput
 from .details import Details
@@ -40,6 +41,7 @@ class Window(QMainWindow):
     stop_requested = Signal()
     retry_requested = Signal(object)
     login_requested = Signal()
+    adapters_requested = Signal()
     image_folder_requested = Signal()
     session_open_requested = Signal(str)
     link_open_requested = Signal(str)
@@ -57,7 +59,7 @@ class Window(QMainWindow):
         self.setWindowIcon(
             QIcon(str(Path(__file__).resolve().parent.parent / "assets/logo.ico"))
         )
-        self.resize(1180, 760)
+        self.resize(1240, 920)
 
         self._groups = ConversationInput()
         self._groups.query_requested.connect(self.conversation_query_requested.emit)
@@ -132,20 +134,43 @@ class Window(QMainWindow):
             )
         table.itemSelectionChanged.connect(self._show_selection)
         table.setWordWrap(False)
+        table.setAlternatingRowColors(True)
+        table.setShowGrid(False)
+        table.verticalHeader().setVisible(False)
+        table.verticalHeader().setDefaultSectionSize(36)
+        table.setColumnWidth(1, 175)
+        table.setColumnWidth(0, 150)
         return table
 
     def _create_layout(self) -> QWidget:
         widget = QWidget()
         layout = QVBoxLayout(widget)
-        layout.addWidget(QLabel("微信会话"))
-        layout.addWidget(self._groups)
-        layout.addWidget(
-            QLabel("地址过滤（仅限制自动扫码，每行一个，留白允许所有网址）")
-        )
-        layout.addWidget(self._addresses)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(12)
+        heading = QLabel("Auto QR Scanner")
+        heading.setObjectName("heading")
+        layout.addWidget(heading)
+        subtitle = QLabel("后台读取图片，识别二维码并使用内置浏览器处理链接。")
+        subtitle.setObjectName("muted")
+        layout.addWidget(subtitle)
+        inputs = QHBoxLayout()
+        inputs.setSpacing(16)
+        for title, field in [
+            ("微信会话 · 每行一个", self._groups),
+            ("地址过滤 · 每行一个，留白允许所有网址", self._addresses),
+        ]:
+            column = QVBoxLayout()
+            label = QLabel(title)
+            label.setObjectName("section")
+            column.addWidget(label)
+            field.setFixedHeight(82)
+            column.addWidget(field)
+            inputs.addLayout(column, 1)
+        layout.addLayout(inputs)
 
         controls = QHBoxLayout()
         self._start = self._button("开始监听", self._request_start, controls)
+        self._start.setObjectName("primary")
         self._latest = self._button(
             "扫描最近图片",
             lambda: self.latest_requested.emit(self._groups.toPlainText().splitlines()),
@@ -154,11 +179,20 @@ class Window(QMainWindow):
         self._stop = self._button("停止", self.stop_requested.emit, controls)
         self._stop.setEnabled(False)
         self._button("打开内置浏览器", self.login_requested.emit, controls)
+        self._button("查看适配器", self.adapters_requested.emit, controls)
         self._button("打开图片文件夹", self.image_folder_requested.emit, controls)
         layout.addLayout(controls)
-        layout.addWidget(self._automatic)
-        for button in self._image_modes.values():
-            layout.addWidget(button)
+        options = QHBoxLayout()
+        options.addWidget(self._automatic)
+        options.addStretch()
+        for mode, button in self._image_modes.items():
+            button.setToolTip(button.text())
+            button.setText("使用缩略图" if mode == "thumbnail" else "使用压缩图")
+            options.addWidget(button)
+        hint = QLabel("缩略图更快 · 压缩图更清晰 · 可同时选择")
+        hint.setObjectName("muted")
+        options.addWidget(hint)
+        layout.addLayout(options)
         layout.addWidget(self._session_status)
 
         splitter = QSplitter(Qt.Orientation.Vertical)
@@ -166,7 +200,7 @@ class Window(QMainWindow):
         splitter.addWidget(self._details)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
-        layout.addWidget(splitter)
+        layout.addWidget(splitter, 1)
 
         actions = QHBoxLayout()
         self._button("复制内容", self._copy_content, actions)
@@ -175,6 +209,7 @@ class Window(QMainWindow):
         self._button("重新识别并处理", self._retry, actions)
         layout.addLayout(actions)
         layout.addWidget(self._status)
+        self._status.setObjectName("status")
         return widget
 
     @staticmethod
@@ -195,6 +230,14 @@ class Window(QMainWindow):
 
     def automatic_open(self) -> bool:
         return self._automatic.isChecked()
+
+    def show_adapters(self, rows: list[dict[str, str]]) -> None:
+        if hasattr(self, "_adapter_dialog"):
+            self._adapter_dialog.show()
+            self._adapter_dialog.raise_()
+            return
+        self._adapter_dialog = AdapterDialog(self, rows)
+        self._adapter_dialog.show()
 
     def address_filter(self) -> AddressFilter:
         return AddressFilter(self._addresses.toPlainText())

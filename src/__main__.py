@@ -32,10 +32,12 @@ def main() -> int:
     from PySide6.QtWidgets import QApplication
 
     from .app import App
+    from .theme import apply_theme
     from .wechat import WeChat
     from .window import Window
 
     application = QApplication(sys.argv[:1])
+    apply_theme(application)
     window = Window()
     data_directory = arguments.data.resolve()
     controller = App(

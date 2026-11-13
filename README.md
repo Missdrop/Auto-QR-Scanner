@@ -36,17 +36,18 @@
 - 微信未缓存的图片暂时无法读取，可手动打开图片后重试。
 - 图片、记录、微信数据库缓存和浏览器登录资料保存在本机 `data` 目录，请勿上传或分享该目录。
 
-## 贡献与许可
+## 网站适配接口
 
-### 网站适配接口
-
-在 `website_adapters/<名称>/adapter.py` 中定义 `Adapter` 类，修改后重启程序。该目录已被 Git 忽略，请只放入自己信任的代码。
+在 `website_adapters/<名称>/adapter.py` 中定义 `Adapter` 类，修改后重启程序。
 
 ```python
 from urllib.parse import urlsplit
 
 
 class Adapter:
+    version = "1.0.0"
+    description = "Process links from example.com"
+
     def matches(self, url: str) -> bool:
         return urlsplit(url).hostname == "example.com"
 
@@ -56,6 +57,10 @@ class Adapter:
 ```
 
 `matches` 判断是否接管网址；`process` 使用已登录的 Chromium 页面执行操作，返回 `(结果码, 提示)`：`0` 为成功，`401/403` 为需登录，其余为未通过。未匹配适配器的网址按普通链接打开。请勿把“页面打开”当作处理成功。
+
+适配器名称使用文件夹名；可选的 `version`、`description` 会显示在“查看适配器”窗口中。
+
+## 贡献与许可
 
 开发和贡献说明见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 

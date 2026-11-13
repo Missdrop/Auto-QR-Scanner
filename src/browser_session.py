@@ -119,6 +119,9 @@ class BrowserSession:
     def status(self) -> str:
         return ""
 
+    def adapter_information(self) -> list[dict[str, str]]:
+        return self._adapters.information()
+
     def close(self) -> None:
         self._closed = True
         with self._queue_lock:

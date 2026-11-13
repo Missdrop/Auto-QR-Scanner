@@ -9,6 +9,32 @@ from src.website_adapters import WebsiteAdapters
 
 
 class WebsiteAdaptersTest(unittest.TestCase):
+    def test_adapter_information_includes_metadata_and_load_errors(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            good, bad = root / "good", root / "bad"
+            good.mkdir()
+            bad.mkdir()
+            (good / "adapter.py").write_text(
+                "class Adapter:\n"
+                "    name = 'Example adapter'\n"
+                "    version = '1.0'\n"
+                "    description = 'Example description'\n"
+                "    def matches(self, url): return True\n"
+                "    def process(self, page, url): return 0, 'Accepted'\n"
+            )
+            (bad / "adapter.py").write_text("raise ValueError('private data')")
+            registry = WebsiteAdapters(root)
+            rows = registry.information()
+            self.assertEqual(rows[0]["status"], "error")
+            self.assertEqual(rows[0]["error"], "ValueError")
+            self.assertEqual(rows[1]["name"], "good")
+            self.assertEqual(rows[1]["version"], "1.0")
+            self.assertEqual(rows[1]["description"], "Example description")
+            self.assertEqual(rows[1]["status"], "loaded")
+            rows[1]["name"] = "Changed"
+            self.assertEqual(registry.information()[1]["name"], "good")
+
     def test_adapter_failure_does_not_drop_the_next_queued_url(self):
         with tempfile.TemporaryDirectory() as directory:
             outcomes = []
