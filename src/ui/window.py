@@ -156,8 +156,8 @@ class Window(QMainWindow):
         inputs = QHBoxLayout()
         inputs.setSpacing(16)
         for title, field in [
-            ("微信会话 · 每行一个", self._groups),
-            ("地址过滤 · 每行一个，留白允许所有网址", self._addresses),
+            ("微信会话", self._groups),
+            ("地址过滤", self._addresses),
         ]:
             column = QVBoxLayout()
             label = QLabel(title)
