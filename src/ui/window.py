@@ -78,8 +78,16 @@ class Window(QMainWindow):
         self._automatic.setChecked(True)
         self._image_modes: dict[str, QCheckBox] = {}
         descriptions = {
-            "thumbnail": "使用缩略图：体积小、速度快、清晰度低；只读后台缓存。",
-            "compressed": "使用压缩图：微信的普通清晰版本；只读后台缓存。",
+            "thumbnail": (
+                "缩略图：速度快、清晰度低。实测各场景均可获取，"
+                "不受是否选中会话、免打扰或前后台影响。\n"
+                "具体情况请自行测试；最保险的是将微信置于前台并打开监听会话。"
+            ),
+            "compressed": (
+                "压缩图：更清晰。实测需在微信中选中监听会话，"
+                "免打扰和前后台状态未影响结果；仅读取已有缓存。\n"
+                "具体情况请自行测试；最保险的是将微信置于前台并打开监听会话。"
+            ),
         }
         # Apply the revised defaults once, then preserve subsequent user choices.
         if not self._settings.value("image_defaults_updated", False, type=bool):
@@ -189,10 +197,14 @@ class Window(QMainWindow):
             button.setToolTip(button.text())
             button.setText("使用缩略图" if mode == "thumbnail" else "使用压缩图")
             options.addWidget(button)
-        hint = QLabel("缩略图更快 · 压缩图更清晰 · 可同时选择")
+        hint = QLabel("实测压缩图需选中会话（详情见悬停提示）")
         hint.setObjectName("muted")
         options.addWidget(hint)
         layout.addLayout(options)
+        cache_hint = QLabel("请自行测试；最保险的是将微信置于前台，并打开监听会话。")
+        cache_hint.setObjectName("muted")
+        cache_hint.setWordWrap(True)
+        layout.addWidget(cache_hint)
         layout.addWidget(self._session_status)
 
         splitter = QSplitter(Qt.Orientation.Vertical)
