@@ -29,6 +29,9 @@ class BrowserPageTest(unittest.TestCase):
         adapter.process.assert_called_once_with(
             context.pages[0], "https://example.com/"
         )
+        self.assertTrue(
+            engine.launch_persistent_context.call_args.kwargs["chromium_sandbox"]
+        )
         self.assertEqual((result.result, result.details), ("Completed", "Accepted"))
         context.close.assert_called_once()
 

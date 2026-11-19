@@ -7,7 +7,23 @@ from browser.client import Browser
 
 
 class BrowserTest(unittest.TestCase):
+    def test_local_scripts_use_a_managed_browser_without_credentials_in_arguments(self):
+        with (
+            patch(
+                "browser.client.BrowserScripts.paths", return_value=[Path("browser.js")]
+            ),
+            patch("browser.client.subprocess.Popen") as start,
+        ):
+            Browser(Path("data/session")).open("https://example.com/")
+        arguments = start.call_args.args[0]
+        self.assertIn("browser.launcher", arguments)
+        self.assertIn(str(Path("data/session/chromium").resolve()), arguments)
+        self.assertNotIn("token", " ".join(arguments))
+
     def setUp(self):
+        scripts = patch("browser.client.BrowserScripts.paths", return_value=[])
+        scripts.start()
+        self.addCleanup(scripts.stop)
         runtime = patch(
             "browser.client.Chromium.executable",
             return_value=Path("runtime.exe"),

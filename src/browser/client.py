@@ -1,4 +1,5 @@
 import subprocess
+import sys
 from pathlib import Path
 from threading import Thread
 
@@ -6,6 +7,7 @@ from adapters.base import AdapterResult
 from adapters.registry import WebsiteAdapter
 from browser.page import BrowserPage
 from browser.runtime import Chromium
+from browser.scripts import BrowserScripts
 
 
 class Browser:
@@ -21,19 +23,34 @@ class Browser:
         active = self._process is not None and self._process.poll() is None
         profile = (self._directory / "chromium").resolve()
         profile.mkdir(parents=True, exist_ok=True)
-        process = subprocess.Popen(
-            [
-                str(Chromium().executable()),
-                "--new-window",
-                "--user-data-dir=" + str(profile),
-                "--no-first-run",
-                "--no-default-browser-check",
+        scripts = BrowserScripts()
+        arguments = [
+            str(Chromium().executable()),
+            "--new-window",
+            "--user-data-dir=" + str(profile),
+            "--no-first-run",
+            "--no-default-browser-check",
+            url,
+        ]
+        if not active and scripts.paths():
+            arguments = [
+                sys.executable,
+                "-m",
+                "browser.launcher",
+                "--profile",
+                str(profile),
+                "--scripts",
+                str(scripts.directory.resolve()),
+                "--url",
                 url,
-            ],
+            ]
+        process = subprocess.Popen(
+            arguments,
             cwd=Path(__file__).resolve().parents[2],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         if active:
             # Chromium forwards this navigation to the existing profile owner.

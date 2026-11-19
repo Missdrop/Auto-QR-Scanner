@@ -21,6 +21,7 @@ class BrowserPage:
                 self._profile.resolve(),
                 executable_path=Chromium().executable(),
                 headless=True,
+                chromium_sandbox=True,
                 ignore_default_args=["--enable-automation"],
                 timeout=15000,
             )
