@@ -25,6 +25,46 @@ from wechat.client import WeChat
 
 
 class AppTest(unittest.TestCase):
+    def test_default_browser_bypasses_adapters_and_records_opened_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            window = Window(
+                QSettings(str(root / "settings.ini"), QSettings.Format.IniFormat)
+            )
+            history = History(root / "history.sqlite3")
+            controller = App(
+                WeChat(root / "images"),
+                Scanner(ImageProcessor()),
+                history,
+                window,
+                root / "browser",
+            )
+            url = "https://example.com/qr"
+            try:
+                self.assertTrue(window.internal_browser())
+                window._internal_browser.setChecked(False)
+                with (
+                    patch(
+                        "application.controller.QDesktopServices.openUrl",
+                        return_value=True,
+                    ) as external,
+                    patch.object(controller._session, "open") as internal,
+                ):
+                    controller._open_session(url)
+                    external.assert_called_once()
+                    internal.assert_not_called()
+                outcome = history.outcome(url)
+                self.assertEqual(outcome.status, "opened_external")
+                self.assertEqual(outcome.label(), "已在默认浏览器打开")
+                with patch(
+                    "application.controller.QDesktopServices.openUrl"
+                ) as external:
+                    controller._open_link("javascript:alert(1)")
+                    external.assert_not_called()
+            finally:
+                controller.close()
+                window.close()
+
     def test_late_scan_results_do_not_open_links_after_closing(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

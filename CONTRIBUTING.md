@@ -28,6 +28,8 @@ uv run --extra wechat python src/main.py
 
 具体网站适配仍只放在不提交的 `website_adapters` 目录。
 
+适配器可选配 `browser.js`，在手动打开的内置浏览器中于页面脚本前运行，用于网站所需的会话初始化。脚本应自行限制来源和页面范围，避免影响其他网站；不要记录凭证或无限重试登录。
+
 仅识别本地图片，不打开链接：
 
 ```powershell

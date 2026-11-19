@@ -183,16 +183,39 @@ class App(QObject):
             self.session_notice.emit(str(exception))
 
     def _open_link(self, url: str) -> None:
+        if not self._window.internal_browser():
+            self._open_external(url)
+            return
         try:
             self._session.open_link(url)
         except (ValueError, OSError) as exception:
             self.session_notice.emit(str(exception))
 
     def _open_session(self, url: str) -> None:
+        if not self._window.internal_browser():
+            self._open_external(url)
+            return
         try:
             self._session.open(url)
         except (ValueError, OSError) as exception:
             self.session_notice.emit(str(exception))
+
+    def _open_external(self, url: str) -> None:
+        if self._closed:
+            return
+        if not BrowserSession.is_web_url(url):
+            self.session_notice.emit("Only HTTP or HTTPS links can open in the browser")
+            return
+        if QDesktopServices.openUrl(QUrl(url)):
+            self._show_outcome(
+                Outcome(
+                    url,
+                    "opened_external",
+                    details="已交给默认浏览器打开，无法读取网页处理结果。",
+                )
+            )
+        else:
+            self._show_outcome(Outcome(url, "error", details="无法打开默认浏览器。"))
 
     def close(self) -> None:
         if self._closed:

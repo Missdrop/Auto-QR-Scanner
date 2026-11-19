@@ -76,6 +76,13 @@ class Window(QMainWindow):
         self._addresses.setMaximumHeight(65)
         self._automatic = QCheckBox("识别后自动扫码")
         self._automatic.setChecked(True)
+        self._internal_browser = QCheckBox("使用内置浏览器")
+        self._internal_browser.setChecked(
+            bool(self._settings.value("internal_browser", True, type=bool))
+        )
+        self._internal_browser.setToolTip(
+            "取消勾选后使用默认浏览器打开链接，只能显示已打开，无法读取网站处理结果。"
+        )
         self._image_modes: dict[str, QCheckBox] = {}
         descriptions = {
             "thumbnail": "使用缩略图：体积小、速度快、清晰度低；只读后台缓存。",
@@ -184,6 +191,7 @@ class Window(QMainWindow):
         layout.addLayout(controls)
         options = QHBoxLayout()
         options.addWidget(self._automatic)
+        options.addWidget(self._internal_browser)
         options.addStretch()
         for mode, button in self._image_modes.items():
             button.setToolTip(button.text())
@@ -249,6 +257,9 @@ class Window(QMainWindow):
         return [
             mode for mode, button in self._image_modes.items() if button.isChecked()
         ]
+
+    def internal_browser(self) -> bool:
+        return self._internal_browser.isChecked()
 
     def set_monitoring(self, running: bool) -> None:
         self._start.setEnabled(not running)
@@ -336,6 +347,7 @@ class Window(QMainWindow):
     def closeEvent(self, event: QCloseEvent) -> None:
         self._settings.setValue("address_filter", self._addresses.toPlainText())
         self._settings.setValue("image_modes", self.image_modes())
+        self._settings.setValue("internal_browser", self.internal_browser())
         self._settings.setValue("groups", self._groups.toPlainText())
         self.closing.emit()
         event.accept()
